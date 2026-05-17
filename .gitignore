@@ -1,0 +1,11 @@
+RollTracker/bin/
+RollTracker/obj/
+.vs/
+.idea/
+*.user
+*.suo
+*.tmp
+
+!dist/
+!dist/RollTracker/
+!dist/RollTracker/latest.zip

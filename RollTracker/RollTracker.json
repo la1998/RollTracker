@@ -1,0 +1,13 @@
+{
+  "Author": "private",
+  "Name": "RollTracker",
+  "Punchline": "Tracks /random rolls for private round games.",
+  "Description": "Reads chat messages, detects /random rolls, shows all rolls plus highest and lowest roll in a small ImGui window. Commands: /rolltracker, /rt.",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "random",
+    "roll",
+    "tracker",
+    "private"
+  ]
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "Author": "private",
+    "Name": "RollTracker",
+    "InternalName": "RollTracker",
+    "AssemblyVersion": "0.1.0.0",
+    "Description": "Reads chat messages, detects /random rolls, shows all rolls plus highest and lowest roll in a small ImGui window. Commands: /rolltracker, /rt.",
+    "ApplicableVersion": "any",
+    "Tags": [
+      "random",
+      "roll",
+      "tracker",
+      "private"
+    ],
+    "DalamudApiLevel": 15,
+    "LoadRequiredState": 0,
+    "LoadSync": false,
+    "CanUnloadAsync": false,
+    "LoadPriority": 0,
+    "Punchline": "Tracks /random rolls for private round games.",
+    "AcceptsFeedback": false,
+    "DownloadLinkInstall": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
+    "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
+    "DownloadLinkUpdate": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
+    "RepoUrl": "https://github.com/la1998/RollTracker"
+  }
+]
