@@ -9,5 +9,6 @@
     "roll",
     "tracker",
     "private"
-  ]
+  ],
+  "AcceptsFeedback": false
 }
