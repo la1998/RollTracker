@@ -46,6 +46,8 @@ repo.json
 - `/rolltracker end` sends the current highest/lowest result to yell chat, then clears the list.
 - `/rolltracker test` adds three fake rolls so you can check the UI.
 
+The window also has `Auto off outside house`. When enabled, RollTracker turns itself off automatically when you leave a housing interior.
+
 ## Build
 
 Prerequisites:

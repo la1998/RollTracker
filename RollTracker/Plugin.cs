@@ -27,6 +27,12 @@ public sealed class Plugin : IDalamudPlugin
     internal static IFramework Framework { get; private set; } = null!;
 
     [PluginService]
+    internal static IClientState ClientState { get; private set; } = null!;
+
+    [PluginService]
+    internal static IDataManager DataManager { get; private set; } = null!;
+
+    [PluginService]
     internal static IPluginLog Log { get; private set; } = null!;
 
     public WindowSystem WindowSystem { get; } = new("RollTracker");
@@ -40,7 +46,15 @@ public sealed class Plugin : IDalamudPlugin
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-        RollTrackerService = new RollTrackerService(ChatGui, CommandManager, Framework, Log, Configuration, SaveConfiguration);
+        RollTrackerService = new RollTrackerService(
+            ChatGui,
+            CommandManager,
+            Framework,
+            ClientState,
+            DataManager,
+            Log,
+            Configuration,
+            SaveConfiguration);
         MainWindow = new MainWindow(RollTrackerService, Configuration, SaveConfiguration);
 
         WindowSystem.AddWindow(MainWindow);

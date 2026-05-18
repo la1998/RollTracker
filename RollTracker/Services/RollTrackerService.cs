@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using Dalamud.Game.Chat;
 using Dalamud.Plugin.Services;
+using Lumina.Excel.Sheets;
 
 namespace RollTracker.Services;
 
@@ -13,33 +14,42 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly IChatGui chatGui;
     private readonly ICommandManager commandManager;
     private readonly IFramework framework;
+    private readonly IClientState clientState;
     private readonly IPluginLog log;
     private readonly Configuration configuration;
-    private readonly Action saveConfiguration;
+    private readonly System.Action saveConfiguration;
     private readonly TextCommandService textCommandService = new();
     private readonly List<RollEntry> rolls = [];
     private readonly Queue<MacroStep> pendingMacroSteps = [];
+    private readonly HashSet<uint> housingInteriorTerritoryIds;
 
     private DateTimeOffset? roundEndsAt;
     private DateTimeOffset nextMacroStepAt;
+    private bool wasInHousingInterior;
 
     public RollTrackerService(
         IChatGui chatGui,
         ICommandManager commandManager,
         IFramework framework,
+        IClientState clientState,
+        IDataManager dataManager,
         IPluginLog log,
         Configuration configuration,
-        Action saveConfiguration)
+        System.Action saveConfiguration)
     {
         this.chatGui = chatGui;
         this.commandManager = commandManager;
         this.framework = framework;
+        this.clientState = clientState;
         this.log = log;
         this.configuration = configuration;
         this.saveConfiguration = saveConfiguration;
+        housingInteriorTerritoryIds = dataManager.GetExcelSheet<HousingIndoorTerritory>()?.Select(row => row.RowId).ToHashSet() ?? [];
+        wasInHousingInterior = IsHousingInterior(clientState.TerritoryType);
 
         this.chatGui.ChatMessage += OnHandleableChatMessage;
         this.chatGui.LogMessage += OnLogMessage;
+        this.clientState.TerritoryChanged += OnTerritoryChanged;
         this.framework.Update += OnFrameworkUpdate;
     }
 
@@ -59,6 +69,7 @@ internal sealed partial class RollTrackerService : IDisposable
     {
         chatGui.ChatMessage -= OnHandleableChatMessage;
         chatGui.LogMessage -= OnLogMessage;
+        clientState.TerritoryChanged -= OnTerritoryChanged;
         framework.Update -= OnFrameworkUpdate;
     }
 
@@ -257,6 +268,30 @@ internal sealed partial class RollTrackerService : IDisposable
         {
             FinishRoundAndReset();
         }
+    }
+
+    private void OnTerritoryChanged(uint territoryType)
+    {
+        var isInHousingInterior = IsHousingInterior(territoryType);
+
+        if (configuration.AutoDisableWhenLeavingHousing &&
+            configuration.Enabled &&
+            wasInHousingInterior &&
+            !isInHousingInterior)
+        {
+            configuration.Enabled = false;
+            roundEndsAt = null;
+            pendingMacroSteps.Clear();
+            saveConfiguration();
+            chatGui.Print("RollTracker disabled because you left the house.", "RollTracker");
+        }
+
+        wasInHousingInterior = isInHousingInterior;
+    }
+
+    private bool IsHousingInterior(uint territoryType)
+    {
+        return housingInteriorTerritoryIds.Contains(territoryType);
     }
 
     private void BuildMacroQueue()

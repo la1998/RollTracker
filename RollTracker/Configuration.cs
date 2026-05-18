@@ -8,6 +8,8 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool Enabled { get; set; } = true;
 
+    public bool AutoDisableWhenLeavingHousing { get; set; } = true;
+
     public int MacroDurationSeconds { get; set; } = 60;
 
     public int MacroLineDelayMilliseconds { get; set; } = 1000;

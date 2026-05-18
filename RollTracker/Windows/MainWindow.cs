@@ -43,6 +43,13 @@ internal sealed class MainWindow : Window, IDisposable
             rollTrackerService.SetEnabled(enabled);
         }
 
+        var autoDisableWhenLeavingHousing = configuration.AutoDisableWhenLeavingHousing;
+        if (ImGui.Checkbox("Auto off outside house", ref autoDisableWhenLeavingHousing))
+        {
+            configuration.AutoDisableWhenLeavingHousing = autoDisableWhenLeavingHousing;
+            saveConfiguration();
+        }
+
         ImGui.SameLine();
         ImGui.TextUnformatted(rollTrackerService.IsRoundRunning
             ? $"Round: {Math.Max(0, (int)Math.Ceiling(rollTrackerService.RemainingRoundTime.TotalSeconds))}s"
