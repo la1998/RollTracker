@@ -3,7 +3,7 @@
     "Author": "Arty",
     "Name": "RollTracker",
     "InternalName": "RollTracker",
-    "AssemblyVersion": "0.1.0.2",
+    "AssemblyVersion": "0.1.0.3",
     "Description": "Reads chat messages, detects /random rolls, shows all rolls plus highest and lowest roll in a small ImGui window. Commands: /rolltracker, /rt.",
     "ApplicableVersion": "any",
     "Tags": [

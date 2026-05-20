@@ -22,6 +22,7 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly List<RollEntry> rolls = [];
     private readonly Queue<MacroStep> pendingMacroSteps = [];
     private readonly HashSet<uint> housingInteriorTerritoryIds;
+    private readonly List<string> worldNames;
 
     private DateTimeOffset? roundEndsAt;
     private DateTimeOffset nextMacroStepAt;
@@ -45,6 +46,7 @@ internal sealed partial class RollTrackerService : IDisposable
         this.configuration = configuration;
         this.saveConfiguration = saveConfiguration;
         housingInteriorTerritoryIds = dataManager.GetExcelSheet<HousingIndoorTerritory>()?.Select(row => row.RowId).ToHashSet() ?? [];
+        worldNames = BuildWorldNames(dataManager);
         wasInHousingInterior = IsHousingInterior(clientState.TerritoryType);
 
         this.chatGui.ChatMessage += OnHandleableChatMessage;
@@ -227,6 +229,8 @@ internal sealed partial class RollTrackerService : IDisposable
 
     private void AddRoll(string playerName, int value)
     {
+        playerName = NormalizePlayerName(playerName);
+
         if (string.IsNullOrWhiteSpace(playerName))
         {
             playerName = "Unknown";
@@ -361,7 +365,7 @@ internal sealed partial class RollTrackerService : IDisposable
         return message.Equals("!tod", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool TryParseRoll(string sender, string message, out string playerName, out int value)
+    private bool TryParseRoll(string sender, string message, out string playerName, out int value)
     {
         foreach (var regex in RollRegexes())
         {
@@ -393,9 +397,61 @@ internal sealed partial class RollTrackerService : IDisposable
         return false;
     }
 
-    private static string NormalizePlayerName(string rawName)
+    private string NormalizePlayerName(string rawName)
     {
-        return rawName.Trim().TrimEnd('.', ':');
+        var name = rawName.Trim().TrimEnd('.', ':');
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return string.Empty;
+        }
+
+        var atIndex = name.IndexOf('@', StringComparison.Ordinal);
+        if (atIndex > 0)
+        {
+            name = name[..atIndex].Trim();
+        }
+
+        foreach (var worldName in worldNames)
+        {
+            if (name.EndsWith($" {worldName}", StringComparison.OrdinalIgnoreCase))
+            {
+                return name[..^worldName.Length].Trim();
+            }
+
+            if (name.EndsWith(worldName, StringComparison.OrdinalIgnoreCase) &&
+                name.Length > worldName.Length &&
+                char.IsLower(name[name.Length - worldName.Length - 1]))
+            {
+                return name[..^worldName.Length].Trim();
+            }
+        }
+
+        return name;
+    }
+
+    private static List<string> BuildWorldNames(IDataManager dataManager)
+    {
+        var names = dataManager.GetExcelSheet<World>()?
+            .Select(row => row.Name.ToString().Trim())
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(name => name.Length)
+            .ToList() ?? [];
+
+        if (names.Count > 0)
+        {
+            return names;
+        }
+
+        return
+        [
+            "Alpha", "Balmung", "Behemoth", "Bismarck", "Brynhildr", "Cactuar", "Cerberus", "Coeurl",
+            "Diabolos", "Excalibur", "Exodus", "Faerie", "Famfrit", "Gilgamesh", "Goblin", "Hyperion",
+            "Jenova", "Lamia", "Leviathan", "Lich", "Louisoix", "Malboro", "Mateus", "Midgardsormr",
+            "Moogle", "Odin", "Omega", "Phantom", "Phoenix", "Ragnarok", "Raiden", "Ravana",
+            "Sargatanas", "Sagittarius", "Sephirot", "Seraph", "Shiva", "Siren", "Sophia", "Spriggan",
+            "Twintania", "Ultros", "Zalera", "Zodiark", "Zurvan"
+        ];
     }
 
     private static bool IsAllowedRollRange(Match match)
