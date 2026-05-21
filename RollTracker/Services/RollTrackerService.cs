@@ -143,6 +143,9 @@ internal sealed partial class RollTrackerService : IDisposable
         }
 
         Reset();
+        pendingMacroSteps.Clear();
+        roundEndsAt = null;
+
         BuildMacroQueue();
         roundEndsAt = DateTimeOffset.Now.AddSeconds(Math.Clamp(configuration.MacroDurationSeconds, 1, 600));
         nextMacroStepAt = DateTimeOffset.Now;

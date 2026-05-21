@@ -110,3 +110,5 @@ Copy-Item .\RollTracker\bin\x64\Release\RollTracker\latest.zip .\dist\RollTracke
 Only the first normal `/random` roll per player counts during a round. Later rolls by the same player are ignored. Limited rolls such as `/random 10` are ignored when the game exposes the roll range to Dalamud.
 
 Cross-world player names are normalized before being stored, so `Name@World`, `Name World`, and `NameWorld` are treated as the same player name where the world name can be recognized.
+
+When `!tod` starts a round, the current roll list and any previous round state are cleared before the macro starts.
