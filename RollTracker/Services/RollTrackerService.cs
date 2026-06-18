@@ -99,13 +99,26 @@ internal sealed partial class RollTrackerService : IDisposable
             return;
         }
 
-        var result = $"/y \"{highest.PlayerName}\">\"{lowest.PlayerName}\"";
+        var result = BuildResultCommand(highest, lowest);
         if (!TryExecuteTextCommand(result))
         {
             chatGui.PrintError("Could not send result to yell chat.", "RollTracker");
         }
 
         Reset();
+    }
+
+    private string BuildResultCommand(RollEntry highest, RollEntry lowest)
+    {
+        var template = string.IsNullOrWhiteSpace(configuration.ResultCommandTemplate)
+            ? "/y \"{highest}\">\"{lowest}\""
+            : configuration.ResultCommandTemplate;
+
+        return template
+            .Replace("{highest}", highest.PlayerName, StringComparison.OrdinalIgnoreCase)
+            .Replace("{lowest}", lowest.PlayerName, StringComparison.OrdinalIgnoreCase)
+            .Replace("{highestRoll}", highest.Value.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{lowestRoll}", lowest.Value.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     public void AddTestRolls()

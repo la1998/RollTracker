@@ -99,6 +99,13 @@ internal sealed class MainWindow : Window, IDisposable
             saveConfiguration();
         }
 
+        var resultCommandTemplate = configuration.ResultCommandTemplate;
+        if (ImGui.InputText("Result command", ref resultCommandTemplate, 512))
+        {
+            configuration.ResultCommandTemplate = resultCommandTemplate;
+            saveConfiguration();
+        }
+
         ImGui.Separator();
 
         var tableFlags = ImGuiTableFlags.Borders |

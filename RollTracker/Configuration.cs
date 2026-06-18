@@ -14,5 +14,7 @@ public sealed class Configuration : IPluginConfiguration
 
     public int MacroLineDelayMilliseconds { get; set; } = 1000;
 
-    public string MacroText { get; set; } = "/y ♪ Type /random in chat!  Highest number asks the lowest number, \"Truth or Dare?\" 60 seconds... Begin!\n/wait 55\n/y 5 seconds remain...\n/wait 5\n/y End";
+    public string MacroText { get; set; } = "/y ♦ Time for Truth or Dare ♦  Highest number asks the lowest number, \"Truth or Dare?\"  Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
+
+    public string ResultCommandTemplate { get; set; } = "/y \"{highest}\">\"{lowest}\"";
 }

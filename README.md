@@ -25,6 +25,8 @@ https://raw.githubusercontent.com/la1998/RollTracker/main/repo.json
 
 The window also has `Auto off outside house`. When enabled, RollTracker turns itself off automatically when you leave a housing interior.
 
+The result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`.
+
 ## Notes
 
 Only the first normal `/random` roll per player counts during a round. Later rolls by the same player are ignored. Limited rolls such as `/random 10` are ignored when the game exposes the roll range to Dalamud.
