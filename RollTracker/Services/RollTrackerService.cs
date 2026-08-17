@@ -146,6 +146,22 @@ internal sealed partial class RollTrackerService : IDisposable
         chatGui.Print($"RollTracker {(enabled ? "enabled" : "disabled")}.", "RollTracker");
     }
 
+    public void SetAllModulesEnabled(bool enabled)
+    {
+        configuration.Enabled = enabled;
+        configuration.WifiEnabled = enabled;
+        saveConfiguration();
+
+        if (!enabled)
+        {
+            roundEndsAt = null;
+            pendingMacroSteps.Clear();
+            pendingWifiMacroSteps.Clear();
+        }
+
+        chatGui.Print($"RollTracker modules {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+    }
+
     public void SetWifiEnabled(bool enabled)
     {
         configuration.WifiEnabled = enabled;

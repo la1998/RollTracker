@@ -13,6 +13,10 @@ public sealed class Plugin : IDalamudPlugin
 {
     private const string CommandName = "/rolltracker";
     private const string AliasCommandName = "/rt";
+    private const string CommandHelp =
+        "Commands: /rt opens the UI; /rt on or /rt on all enables all modules; /rt off or /rt off all disables all modules; " +
+        "/rt on tod and /rt off tod control Truth or Dare; /rt on wifi and /rt off wifi control !wifi; " +
+        "/rt status shows module states; /rt reset clears rolls; /rt end ends the current round; /rt test adds test rolls.";
 
     [PluginService]
     internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
@@ -61,11 +65,11 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open RollTracker. Subcommands: on, off, clear/reset, end, test.",
+            HelpMessage = CommandHelp,
         });
         CommandManager.AddHandler(AliasCommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Alias for /rolltracker.",
+            HelpMessage = CommandHelp,
         });
 
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
@@ -99,21 +103,19 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        if (trimmedArgs.Equals("on", StringComparison.OrdinalIgnoreCase))
+        if (TryHandleModuleToggle(trimmedArgs, true))
         {
-            RollTrackerService.SetEnabled(true);
             return;
         }
 
-        if (trimmedArgs.Equals("off", StringComparison.OrdinalIgnoreCase))
+        if (TryHandleModuleToggle(trimmedArgs, false))
         {
-            RollTrackerService.SetEnabled(false);
             return;
         }
 
         if (trimmedArgs.Equals("status", StringComparison.OrdinalIgnoreCase))
         {
-            ChatGui.Print($"RollTracker is {(Configuration.Enabled ? "on" : "off")}.", "RollTracker");
+            ChatGui.Print($"RollTracker ToD is {(Configuration.Enabled ? "on" : "off")}; !wifi is {(Configuration.WifiEnabled ? "on" : "off")}.", "RollTracker");
             return;
         }
 
@@ -131,6 +133,36 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         ToggleMainUi();
+    }
+
+    private bool TryHandleModuleToggle(string args, bool enabled)
+    {
+        var command = enabled ? "on" : "off";
+        if (!args.StartsWith(command, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var target = args[command.Length..].Trim();
+        if (target.Length == 0 || target.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetAllModulesEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("tod", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("wifi", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetWifiEnabled(enabled);
+            return true;
+        }
+
+        return false;
     }
 
     private void ToggleMainUi()

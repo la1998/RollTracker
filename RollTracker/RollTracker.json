@@ -2,7 +2,7 @@
   "Author": "Arty",
   "Name": "RollTracker",
   "Punchline": "Tracks /random rolls for private round games.",
-  "Description": "Reads chat messages, detects /random rolls, shows all rolls plus highest and lowest roll in a small ImGui window. Commands: /rolltracker, /rt.",
+  "Description": "Reads chat messages, detects /random rolls, tracks Truth or Dare rounds, and provides a configurable !wifi macro. Commands: /rt opens the UI; /rt on or /rt on all enables all modules; /rt off or /rt off all disables all modules; /rt on tod and /rt off tod control Truth or Dare; /rt on wifi and /rt off wifi control !wifi; /rt status shows module states; /rt reset clears rolls; /rt end ends the current round; /rt test adds test rolls.",
   "ApplicableVersion": "any",
   "Tags": [
     "random",

@@ -16,18 +16,25 @@ https://raw.githubusercontent.com/la1998/RollTracker/main/repo.json
 
 - `/rolltracker` opens or closes the window.
 - `/rt` opens or closes the window.
-- `/rt on` or `/rolltracker on` enables chat monitoring and `!tod` reaction.
-- `/rt off` or `/rolltracker off` disables chat monitoring and `!tod` reaction.
-- `/rt status` prints whether the plugin is on or off.
+- `/rt on` or `/rolltracker on` enables all modules.
+- `/rt off` or `/rolltracker off` disables all modules.
+- `/rt on all` or `/rt off all` enables or disables all modules.
+- `/rt on tod` or `/rt off tod` enables or disables only Truth or Dare.
+- `/rt on wifi` or `/rt off wifi` enables or disables only `!wifi`.
+- `/rt status` prints whether Truth or Dare and `!wifi` are on or off.
 - `/rolltracker reset` or `/rolltracker clear` clears the current roll list.
 - `/rolltracker end` sends the current highest/lowest result to yell chat, then clears the list.
 - `/rolltracker test` adds three fake rolls so you can check the UI.
+
+These commands are also listed in the Dalamud plugin installer description and in Dalamud command help.
 
 The window also has `Auto off outside house`. When enabled, RollTracker turns itself off automatically when you leave a housing interior.
 
 The result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`.
 
 `!wifi` is a separate trigger with its own tab, enabled switch, macro text, and chat target. It can send to Yell, Say, or Party and is also turned off automatically when you leave a housing interior.
+
+The `Settings` tab contains `Enable ToD`, `Enable Wifi`, `Auto off outside house`, and quick buttons to enable or disable all modules.
 
 ## Notes
 

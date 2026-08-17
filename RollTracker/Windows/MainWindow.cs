@@ -51,6 +51,12 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.EndTabItem();
         }
 
+        if (ImGui.BeginTabItem("Settings"))
+        {
+            DrawSettingsTab();
+            ImGui.EndTabItem();
+        }
+
         ImGui.EndTabBar();
     }
 
@@ -58,21 +64,7 @@ internal sealed class MainWindow : Window, IDisposable
     {
         var highest = rollTrackerService.HighestRoll;
         var lowest = rollTrackerService.LowestRoll;
-        var enabled = configuration.Enabled;
 
-        if (ImGui.Checkbox("Enabled", ref enabled))
-        {
-            rollTrackerService.SetEnabled(enabled);
-        }
-
-        var autoDisableWhenLeavingHousing = configuration.AutoDisableWhenLeavingHousing;
-        if (ImGui.Checkbox("Auto off outside house", ref autoDisableWhenLeavingHousing))
-        {
-            configuration.AutoDisableWhenLeavingHousing = autoDisableWhenLeavingHousing;
-            saveConfiguration();
-        }
-
-        ImGui.SameLine();
         ImGui.TextUnformatted(rollTrackerService.IsRoundRunning
             ? $"Round: {Math.Max(0, (int)Math.Ceiling(rollTrackerService.RemainingRoundTime.TotalSeconds))}s"
             : "Round: idle");
@@ -162,13 +154,6 @@ internal sealed class MainWindow : Window, IDisposable
 
     private void DrawWifiTab()
     {
-        var wifiEnabled = configuration.WifiEnabled;
-        if (ImGui.Checkbox("Enabled##Wifi", ref wifiEnabled))
-        {
-            rollTrackerService.SetWifiEnabled(wifiEnabled);
-        }
-
-        ImGui.SameLine();
         ImGui.TextUnformatted(rollTrackerService.IsWifiMacroRunning ? "Macro: running" : "Macro: idle");
 
         var channel = configuration.WifiChatChannel;
@@ -202,6 +187,42 @@ internal sealed class MainWindow : Window, IDisposable
         if (ImGui.Button("Run !wifi"))
         {
             rollTrackerService.StartWifiMacro("manual");
+        }
+    }
+
+    private void DrawSettingsTab()
+    {
+        var todEnabled = configuration.Enabled;
+        if (ImGui.Checkbox("Enable ToD", ref todEnabled))
+        {
+            rollTrackerService.SetEnabled(todEnabled);
+        }
+
+        var wifiEnabled = configuration.WifiEnabled;
+        if (ImGui.Checkbox("Enable Wifi", ref wifiEnabled))
+        {
+            rollTrackerService.SetWifiEnabled(wifiEnabled);
+        }
+
+        var autoDisableWhenLeavingHousing = configuration.AutoDisableWhenLeavingHousing;
+        if (ImGui.Checkbox("Auto off outside house", ref autoDisableWhenLeavingHousing))
+        {
+            configuration.AutoDisableWhenLeavingHousing = autoDisableWhenLeavingHousing;
+            saveConfiguration();
+        }
+
+        ImGui.Separator();
+
+        if (ImGui.Button("Enable all"))
+        {
+            rollTrackerService.SetAllModulesEnabled(true);
+        }
+
+        ImGui.SameLine();
+
+        if (ImGui.Button("Disable all"))
+        {
+            rollTrackerService.SetAllModulesEnabled(false);
         }
     }
 

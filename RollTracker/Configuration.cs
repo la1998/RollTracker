@@ -22,5 +22,5 @@ public sealed class Configuration : IPluginConfiguration
 
     public string WifiChatChannel { get; set; } = "Yell";
 
-    public string WifiMacroText { get; set; } = "Wi-Fi information goes here.";
+    public string WifiMacroText { get; set; } = "KinkHouse Shells and Discord:\nLightless - our main sync:\nID: LLS-SWN693A68P5R  PW: KinkHausOCE\n\nPlayerSync - our optional/backup sync:\nID: MSS-6AC6326WFU4P  PW: KinkHausOCE\n\nDiscord:\nhttps://discord.gg/7N7xaghGTr";
 }
