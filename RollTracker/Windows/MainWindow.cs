@@ -34,6 +34,28 @@ internal sealed class MainWindow : Window, IDisposable
 
     public override void Draw()
     {
+        if (!ImGui.BeginTabBar("RollTrackerTabs"))
+        {
+            return;
+        }
+
+        if (ImGui.BeginTabItem("Truth or Dare"))
+        {
+            DrawTruthOrDareTab();
+            ImGui.EndTabItem();
+        }
+
+        if (ImGui.BeginTabItem("!wifi"))
+        {
+            DrawWifiTab();
+            ImGui.EndTabItem();
+        }
+
+        ImGui.EndTabBar();
+    }
+
+    private void DrawTruthOrDareTab()
+    {
         var highest = rollTrackerService.HighestRoll;
         var lowest = rollTrackerService.LowestRoll;
         var enabled = configuration.Enabled;
@@ -136,6 +158,51 @@ internal sealed class MainWindow : Window, IDisposable
         }
 
         ImGui.EndTable();
+    }
+
+    private void DrawWifiTab()
+    {
+        var wifiEnabled = configuration.WifiEnabled;
+        if (ImGui.Checkbox("Enabled##Wifi", ref wifiEnabled))
+        {
+            rollTrackerService.SetWifiEnabled(wifiEnabled);
+        }
+
+        ImGui.SameLine();
+        ImGui.TextUnformatted(rollTrackerService.IsWifiMacroRunning ? "Macro: running" : "Macro: idle");
+
+        var channel = configuration.WifiChatChannel;
+        if (ImGui.BeginCombo("Chat", channel))
+        {
+            foreach (var option in new[] { "Yell", "Say", "Party" })
+            {
+                var selected = channel.Equals(option, StringComparison.OrdinalIgnoreCase);
+                if (ImGui.Selectable(option, selected))
+                {
+                    configuration.WifiChatChannel = option;
+                    saveConfiguration();
+                }
+
+                if (selected)
+                {
+                    ImGui.SetItemDefaultFocus();
+                }
+            }
+
+            ImGui.EndCombo();
+        }
+
+        var wifiMacroText = configuration.WifiMacroText;
+        if (ImGui.InputTextMultiline("Macro##Wifi", ref wifiMacroText, 4096, new Vector2(0, 170 * ImGuiHelpers.GlobalScale)))
+        {
+            configuration.WifiMacroText = wifiMacroText;
+            saveConfiguration();
+        }
+
+        if (ImGui.Button("Run !wifi"))
+        {
+            rollTrackerService.StartWifiMacro("manual");
+        }
     }
 
     private static void DrawSummaryLine(string label, RollEntry? roll)

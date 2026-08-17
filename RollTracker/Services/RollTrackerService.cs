@@ -21,11 +21,13 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly TextCommandService textCommandService = new();
     private readonly List<RollEntry> rolls = [];
     private readonly Queue<MacroStep> pendingMacroSteps = [];
+    private readonly Queue<MacroStep> pendingWifiMacroSteps = [];
     private readonly HashSet<uint> housingInteriorTerritoryIds;
     private readonly List<string> worldNames;
 
     private DateTimeOffset? roundEndsAt;
     private DateTimeOffset nextMacroStepAt;
+    private DateTimeOffset nextWifiMacroStepAt;
     private bool wasInHousingInterior;
 
     public RollTrackerService(
@@ -62,6 +64,8 @@ internal sealed partial class RollTrackerService : IDisposable
     public RollEntry? LowestRoll => rolls.Count == 0 ? null : rolls.MinBy(roll => roll.Value);
 
     public bool IsRoundRunning => roundEndsAt is not null;
+
+    public bool IsWifiMacroRunning => pendingWifiMacroSteps.Count > 0;
 
     public TimeSpan RemainingRoundTime => roundEndsAt is null
         ? TimeSpan.Zero
@@ -142,6 +146,19 @@ internal sealed partial class RollTrackerService : IDisposable
         chatGui.Print($"RollTracker {(enabled ? "enabled" : "disabled")}.", "RollTracker");
     }
 
+    public void SetWifiEnabled(bool enabled)
+    {
+        configuration.WifiEnabled = enabled;
+        saveConfiguration();
+
+        if (!enabled)
+        {
+            pendingWifiMacroSteps.Clear();
+        }
+
+        chatGui.Print($"RollTracker !wifi {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+    }
+
     public void StartRoundFromTrigger(string triggeredBy)
     {
         if (!configuration.Enabled)
@@ -166,6 +183,24 @@ internal sealed partial class RollTrackerService : IDisposable
         chatGui.Print($"Round started by {triggeredBy}.", "RollTracker");
     }
 
+    public void StartWifiMacro(string triggeredBy)
+    {
+        if (!configuration.WifiEnabled)
+        {
+            return;
+        }
+
+        if (IsWifiMacroRunning)
+        {
+            log.Debug("Ignored !wifi from {PlayerName}; wifi macro is already running.", triggeredBy);
+            return;
+        }
+
+        BuildWifiMacroQueue();
+        nextWifiMacroStepAt = DateTimeOffset.Now;
+        chatGui.Print($"!wifi triggered by {triggeredBy}.", "RollTracker");
+    }
+
     private void OnHandleableChatMessage(IHandleableChatMessage chatMessage)
     {
         OnChatMessage(chatMessage);
@@ -175,6 +210,12 @@ internal sealed partial class RollTrackerService : IDisposable
     {
         var sender = chatMessage.Sender.TextValue.Trim();
         var message = chatMessage.Message.TextValue.Trim();
+
+        if (IsWifiTrigger(message))
+        {
+            StartWifiMacro(string.IsNullOrWhiteSpace(sender) ? "Unknown" : sender);
+            return;
+        }
 
         if (!configuration.Enabled)
         {
@@ -272,19 +313,19 @@ internal sealed partial class RollTrackerService : IDisposable
 
     private void OnFrameworkUpdate(IFramework framework)
     {
-        if (!configuration.Enabled || roundEndsAt is null)
-        {
-            return;
-        }
-
         var now = DateTimeOffset.Now;
 
-        if (pendingMacroSteps.Count > 0 && now >= nextMacroStepAt)
+        if (configuration.Enabled && roundEndsAt is not null && pendingMacroSteps.Count > 0 && now >= nextMacroStepAt)
         {
             ExecuteNextMacroStep();
         }
 
-        if (now >= roundEndsAt.Value)
+        if (configuration.WifiEnabled && pendingWifiMacroSteps.Count > 0 && now >= nextWifiMacroStepAt)
+        {
+            ExecuteNextWifiMacroStep();
+        }
+
+        if (configuration.Enabled && roundEndsAt is not null && now >= roundEndsAt.Value)
         {
             FinishRoundAndReset();
         }
@@ -295,13 +336,15 @@ internal sealed partial class RollTrackerService : IDisposable
         var isInHousingInterior = IsHousingInterior(territoryType);
 
         if (configuration.AutoDisableWhenLeavingHousing &&
-            configuration.Enabled &&
+            (configuration.Enabled || configuration.WifiEnabled) &&
             wasInHousingInterior &&
             !isInHousingInterior)
         {
             configuration.Enabled = false;
+            configuration.WifiEnabled = false;
             roundEndsAt = null;
             pendingMacroSteps.Clear();
+            pendingWifiMacroSteps.Clear();
             saveConfiguration();
             chatGui.Print("RollTracker disabled because you left the house.", "RollTracker");
         }
@@ -328,6 +371,20 @@ internal sealed partial class RollTrackerService : IDisposable
         }
     }
 
+    private void BuildWifiMacroQueue()
+    {
+        pendingWifiMacroSteps.Clear();
+
+        var lines = configuration.WifiMacroText
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var line in lines)
+        {
+            pendingWifiMacroSteps.Enqueue(ParseWifiMacroStep(line, configuration.WifiChatChannel));
+        }
+    }
+
     private void ExecuteNextMacroStep()
     {
         var step = pendingMacroSteps.Dequeue();
@@ -346,6 +403,24 @@ internal sealed partial class RollTrackerService : IDisposable
         nextMacroStepAt = DateTimeOffset.Now.AddMilliseconds(Math.Clamp(configuration.MacroLineDelayMilliseconds, 100, 10000));
     }
 
+    private void ExecuteNextWifiMacroStep()
+    {
+        var step = pendingWifiMacroSteps.Dequeue();
+
+        if (step.WaitMilliseconds > 0)
+        {
+            nextWifiMacroStepAt = DateTimeOffset.Now.AddMilliseconds(step.WaitMilliseconds);
+            return;
+        }
+
+        if (!TryExecuteTextCommand(step.Command))
+        {
+            chatGui.PrintError($"Could not run !wifi macro line: {step.Command}", "RollTracker");
+        }
+
+        nextWifiMacroStepAt = DateTimeOffset.Now.AddMilliseconds(Math.Clamp(configuration.MacroLineDelayMilliseconds, 100, 10000));
+    }
+
     private static MacroStep ParseMacroStep(string line)
     {
         if (line.StartsWith("/wait ", StringComparison.OrdinalIgnoreCase) &&
@@ -355,6 +430,27 @@ internal sealed partial class RollTrackerService : IDisposable
         }
 
         return new MacroStep(line, 0);
+    }
+
+    private static MacroStep ParseWifiMacroStep(string line, string channel)
+    {
+        var step = ParseMacroStep(line);
+        if (step.WaitMilliseconds > 0 || step.Command.StartsWith("/", StringComparison.Ordinal))
+        {
+            return step;
+        }
+
+        return new MacroStep($"{GetChatCommand(channel)} {step.Command}", 0);
+    }
+
+    private static string GetChatCommand(string channel)
+    {
+        return channel switch
+        {
+            "Say" => "/s",
+            "Party" => "/p",
+            _ => "/y",
+        };
     }
 
     private bool TryExecuteTextCommand(string command)
@@ -379,6 +475,11 @@ internal sealed partial class RollTrackerService : IDisposable
     private static bool IsRoundEndMarker(string message)
     {
         return message.Equals("!tod", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsWifiTrigger(string message)
+    {
+        return message.Equals("!wifi", StringComparison.OrdinalIgnoreCase);
     }
 
     private bool TryParseRoll(string sender, string message, out string playerName, out int value)

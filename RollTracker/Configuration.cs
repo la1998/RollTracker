@@ -8,6 +8,8 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool Enabled { get; set; } = true;
 
+    public bool WifiEnabled { get; set; } = true;
+
     public bool AutoDisableWhenLeavingHousing { get; set; } = true;
 
     public int MacroDurationSeconds { get; set; } = 60;
@@ -17,4 +19,8 @@ public sealed class Configuration : IPluginConfiguration
     public string MacroText { get; set; } = "/y ♦ Time for Truth or Dare ♦  Highest number asks the lowest number, \"Truth or Dare?\"  Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
 
     public string ResultCommandTemplate { get; set; } = "/y \"{highest}\">\"{lowest}\"";
+
+    public string WifiChatChannel { get; set; } = "Yell";
+
+    public string WifiMacroText { get; set; } = "Wi-Fi information goes here.";
 }
