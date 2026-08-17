@@ -3,8 +3,8 @@
     "Author": "Arty",
     "Name": "RollTracker",
     "InternalName": "RollTracker",
-    "AssemblyVersion": "0.1.0.9",
-    "Description": "Reads chat messages, detects /random rolls, tracks Truth or Dare rounds, and provides a configurable !wifi macro. Commands: /rt opens the UI; /rt on or /rt on all enables all modules; /rt off or /rt off all disables all modules; /rt on tod and /rt off tod control Truth or Dare; /rt on wifi and /rt off wifi control !wifi; /rt status shows module states; /rt reset clears rolls; /rt end ends the current round; /rt test adds test rolls.",
+    "AssemblyVersion": "0.1.0.10",
+    "Description": "Reads chat messages, detects /random rolls, tracks Truth or Dare rounds, and provides a configurable !wifi macro.\n\nCommands:\n/rt - open or close the window.\n/rt on - enable all modules.\n/rt off - disable all modules.\n/rt on tod - enable Truth or Dare.\n/rt off tod - disable Truth or Dare.\n/rt on wifi - enable !wifi.\n/rt off wifi - disable !wifi.\n/rt status - show module states.\n/rt reset - clear the current roll list.\n/rt end - send the current result, then clear the list.\n/rt test - add sample rolls for checking the UI.\n/rolltracker - same commands as /rt.",
     "ApplicableVersion": "any",
     "Tags": [
       "random",

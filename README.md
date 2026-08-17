@@ -14,17 +14,18 @@ https://raw.githubusercontent.com/la1998/RollTracker/main/repo.json
 
 ## Commands
 
-- `/rolltracker` opens or closes the window.
-- `/rt` opens or closes the window.
-- `/rt on` or `/rolltracker on` enables all modules.
-- `/rt off` or `/rolltracker off` disables all modules.
-- `/rt on all` or `/rt off all` enables or disables all modules.
-- `/rt on tod` or `/rt off tod` enables or disables only Truth or Dare.
-- `/rt on wifi` or `/rt off wifi` enables or disables only `!wifi`.
-- `/rt status` prints whether Truth or Dare and `!wifi` are on or off.
-- `/rolltracker reset` or `/rolltracker clear` clears the current roll list.
-- `/rolltracker end` sends the current highest/lowest result to yell chat, then clears the list.
-- `/rolltracker test` adds three fake rolls so you can check the UI.
+- `/rt` - opens or closes the window.
+- `/rt on` - enables all modules.
+- `/rt off` - disables all modules.
+- `/rt on tod` - enables only Truth or Dare.
+- `/rt off tod` - disables only Truth or Dare.
+- `/rt on wifi` - enables only `!wifi`.
+- `/rt off wifi` - disables only `!wifi`.
+- `/rt status` - prints whether Truth or Dare and `!wifi` are on or off.
+- `/rt reset` - clears the current roll list.
+- `/rt end` - sends the current highest/lowest result to yell chat, then clears the list.
+- `/rt test` - adds three fake rolls so you can check the UI.
+- `/rolltracker` - supports the same commands as `/rt`.
 
 These commands are also listed in the Dalamud plugin installer description and in Dalamud command help.
 

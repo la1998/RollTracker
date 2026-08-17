@@ -14,9 +14,19 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandName = "/rolltracker";
     private const string AliasCommandName = "/rt";
     private const string CommandHelp =
-        "Commands: /rt opens the UI; /rt on or /rt on all enables all modules; /rt off or /rt off all disables all modules; " +
-        "/rt on tod and /rt off tod control Truth or Dare; /rt on wifi and /rt off wifi control !wifi; " +
-        "/rt status shows module states; /rt reset clears rolls; /rt end ends the current round; /rt test adds test rolls.";
+        "Commands:\n" +
+        "/rt - open or close the window.\n" +
+        "/rt on - enable all modules.\n" +
+        "/rt off - disable all modules.\n" +
+        "/rt on tod - enable Truth or Dare.\n" +
+        "/rt off tod - disable Truth or Dare.\n" +
+        "/rt on wifi - enable !wifi.\n" +
+        "/rt off wifi - disable !wifi.\n" +
+        "/rt status - show module states.\n" +
+        "/rt reset - clear the current roll list.\n" +
+        "/rt end - send the current result, then clear the list.\n" +
+        "/rt test - add sample rolls for checking the UI.";
+    private const string AliasCommandHelp = "Alias for /rt. Use /rt to see the full command list.";
 
     [PluginService]
     internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
@@ -65,7 +75,7 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = CommandHelp,
+            HelpMessage = AliasCommandHelp,
         });
         CommandManager.AddHandler(AliasCommandName, new CommandInfo(OnCommand)
         {
