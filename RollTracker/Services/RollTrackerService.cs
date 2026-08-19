@@ -28,6 +28,7 @@ internal sealed partial class RollTrackerService : IDisposable
     private DateTimeOffset? roundEndsAt;
     private DateTimeOffset nextMacroStepAt;
     private DateTimeOffset nextWifiMacroStepAt;
+    private int nextManualRollNumber = 1;
     private bool wasInHousingInterior;
 
     public RollTrackerService(
@@ -82,6 +83,7 @@ internal sealed partial class RollTrackerService : IDisposable
     public void Reset()
     {
         rolls.Clear();
+        nextManualRollNumber = 1;
     }
 
     public void FinishRoundAndReset()
@@ -115,14 +117,70 @@ internal sealed partial class RollTrackerService : IDisposable
     private string BuildResultCommand(RollEntry highest, RollEntry lowest)
     {
         var template = string.IsNullOrWhiteSpace(configuration.ResultCommandTemplate)
-            ? "/y \"{highest}\">\"{lowest}\""
+            ? "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})"
             : configuration.ResultCommandTemplate;
 
-        return template
+        var result = template
             .Replace("{highest}", highest.PlayerName, StringComparison.OrdinalIgnoreCase)
             .Replace("{lowest}", lowest.PlayerName, StringComparison.OrdinalIgnoreCase)
             .Replace("{highestRoll}", highest.Value.ToString(), StringComparison.OrdinalIgnoreCase)
             .Replace("{lowestRoll}", lowest.Value.ToString(), StringComparison.OrdinalIgnoreCase);
+
+        var specialRuleText = BuildTodSpecialRuleText(highest, lowest);
+        var secondPairText = BuildTodSecondPairText(highest, lowest);
+        var extraText = string.Join(' ', new[] { secondPairText, specialRuleText }.Where(text => !string.IsNullOrWhiteSpace(text)));
+
+        return string.IsNullOrWhiteSpace(extraText)
+            ? result
+            : $"{result} {extraText}";
+    }
+
+    private string BuildTodSpecialRuleText(RollEntry highest, RollEntry lowest)
+    {
+        if (!configuration.TodSpecialRulesEnabled)
+        {
+            return string.Empty;
+        }
+
+        var messages = new List<string>();
+
+        if (lowest.Value is 0 or 1)
+        {
+            messages.Add("Lowest gets asked Truth and Dare.");
+        }
+
+        if (highest.Value == 999)
+        {
+            messages.Add("Highest can ask both Truth and Dare.");
+        }
+
+        return string.Join(' ', messages);
+    }
+
+    private string BuildTodSecondPairText(RollEntry highest, RollEntry lowest)
+    {
+        if (!configuration.TodSecondPairEnabled || rolls.Count < 4)
+        {
+            return string.Empty;
+        }
+
+        var secondHighest = rolls
+            .OrderByDescending(roll => roll.Value)
+            .ThenBy(roll => roll.Time)
+            .FirstOrDefault(roll => !ReferenceEquals(roll, highest));
+        var secondLowest = rolls
+            .OrderBy(roll => roll.Value)
+            .ThenBy(roll => roll.Time)
+            .FirstOrDefault(roll => !ReferenceEquals(roll, lowest));
+
+        if (secondHighest is null ||
+            secondLowest is null ||
+            ReferenceEquals(secondHighest, secondLowest))
+        {
+            return string.Empty;
+        }
+
+        return $"2nd: \"{secondHighest.PlayerName}\"({secondHighest.Value})>>>\"{secondLowest.PlayerName}\"({secondLowest.Value})";
     }
 
     public void AddTestRolls()
@@ -130,6 +188,33 @@ internal sealed partial class RollTrackerService : IDisposable
         AddRoll("Example One", Random.Shared.Next(1, 1000));
         AddRoll("Example Two", Random.Shared.Next(1, 1000));
         AddRoll("Example Three", Random.Shared.Next(1, 1000));
+        AddRoll("Example Four", Random.Shared.Next(1, 1000));
+    }
+
+    public bool TryAddManualRoll(int value, out string message)
+    {
+        if (!configuration.Enabled)
+        {
+            message = "Truth or Dare is disabled.";
+            return false;
+        }
+
+        if (!IsRoundRunning)
+        {
+            message = "Start a Truth or Dare round before adding manual test rolls.";
+            return false;
+        }
+
+        if (value is < 0 or > 9999)
+        {
+            message = "Manual test rolls must be between 0 and 9999.";
+            return false;
+        }
+
+        var playerName = $"Manual Test {nextManualRollNumber++}";
+        AddRoll(playerName, value);
+        message = $"Added {playerName} with roll {value}.";
+        return true;
     }
 
     public void SetEnabled(bool enabled)
@@ -149,6 +234,12 @@ internal sealed partial class RollTrackerService : IDisposable
     public void SetAllModulesEnabled(bool enabled)
     {
         configuration.Enabled = enabled;
+        configuration.TodSpecialRulesEnabled = enabled;
+        if (!enabled)
+        {
+            configuration.TodSecondPairEnabled = false;
+        }
+
         configuration.WifiEnabled = enabled;
         saveConfiguration();
 

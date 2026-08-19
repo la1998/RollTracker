@@ -198,6 +198,20 @@ internal sealed class MainWindow : Window, IDisposable
             rollTrackerService.SetEnabled(todEnabled);
         }
 
+        var todSpecialRulesEnabled = configuration.TodSpecialRulesEnabled;
+        if (ImGui.Checkbox("Enable ToD special rules", ref todSpecialRulesEnabled))
+        {
+            configuration.TodSpecialRulesEnabled = todSpecialRulesEnabled;
+            saveConfiguration();
+        }
+
+        var todSecondPairEnabled = configuration.TodSecondPairEnabled;
+        if (ImGui.Checkbox("Enable ToD second pair", ref todSecondPairEnabled))
+        {
+            configuration.TodSecondPairEnabled = todSecondPairEnabled;
+            saveConfiguration();
+        }
+
         var wifiEnabled = configuration.WifiEnabled;
         if (ImGui.Checkbox("Enable Wifi", ref wifiEnabled))
         {

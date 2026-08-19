@@ -20,11 +20,16 @@ public sealed class Plugin : IDalamudPlugin
         "/rt off - disable all modules.\n" +
         "/rt on tod - enable Truth or Dare.\n" +
         "/rt off tod - disable Truth or Dare.\n" +
+        "/rt on todrules - enable Truth or Dare special rules.\n" +
+        "/rt off todrules - disable Truth or Dare special rules.\n" +
+        "/rt on todsecond - enable Truth or Dare second pair.\n" +
+        "/rt off todsecond - disable Truth or Dare second pair.\n" +
         "/rt on wifi - enable !wifi.\n" +
         "/rt off wifi - disable !wifi.\n" +
         "/rt status - show module states.\n" +
         "/rt reset - clear the current roll list.\n" +
         "/rt end - send the current result, then clear the list.\n" +
+        "/rt add <number> - add a manual test roll to the running round.\n" +
         "/rt test - add sample rolls for checking the UI.";
     private const string AliasCommandHelp = "Alias for /rt. Use /rt to see the full command list.";
 
@@ -60,6 +65,7 @@ public sealed class Plugin : IDalamudPlugin
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        MigrateConfiguration();
         RollTrackerService = new RollTrackerService(
             ChatGui,
             CommandManager,
@@ -125,13 +131,18 @@ public sealed class Plugin : IDalamudPlugin
 
         if (trimmedArgs.Equals("status", StringComparison.OrdinalIgnoreCase))
         {
-            ChatGui.Print($"RollTracker ToD is {(Configuration.Enabled ? "on" : "off")}; !wifi is {(Configuration.WifiEnabled ? "on" : "off")}.", "RollTracker");
+            ChatGui.Print($"RollTracker ToD is {(Configuration.Enabled ? "on" : "off")}; ToD special rules are {(Configuration.TodSpecialRulesEnabled ? "on" : "off")}; ToD second pair is {(Configuration.TodSecondPairEnabled ? "on" : "off")}; !wifi is {(Configuration.WifiEnabled ? "on" : "off")}.", "RollTracker");
             return;
         }
 
         if (trimmedArgs.Equals("end", StringComparison.OrdinalIgnoreCase))
         {
             RollTrackerService.FinishRoundAndReset();
+            return;
+        }
+
+        if (TryHandleManualRoll(trimmedArgs))
+        {
             return;
         }
 
@@ -166,6 +177,26 @@ public sealed class Plugin : IDalamudPlugin
             return true;
         }
 
+        if (target.Equals("todrules", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("tod rules", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("special", StringComparison.OrdinalIgnoreCase))
+        {
+            Configuration.TodSpecialRulesEnabled = enabled;
+            SaveConfiguration();
+            ChatGui.Print($"RollTracker ToD special rules {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+            return true;
+        }
+
+        if (target.Equals("todsecond", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("tod second", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("second", StringComparison.OrdinalIgnoreCase))
+        {
+            Configuration.TodSecondPairEnabled = enabled;
+            SaveConfiguration();
+            ChatGui.Print($"RollTracker ToD second pair {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+            return true;
+        }
+
         if (target.Equals("wifi", StringComparison.OrdinalIgnoreCase))
         {
             RollTrackerService.SetWifiEnabled(enabled);
@@ -173,6 +204,31 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         return false;
+    }
+
+    private bool TryHandleManualRoll(string args)
+    {
+        if (!args.StartsWith("add", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var valueText = args["add".Length..].Trim();
+        if (!int.TryParse(valueText, out var value))
+        {
+            ChatGui.PrintError("Usage: /rt add <number>", "RollTracker");
+            return true;
+        }
+
+        if (RollTrackerService.TryAddManualRoll(value, out var message))
+        {
+            ChatGui.Print(message, "RollTracker");
+            MainWindow.IsOpen = true;
+            return true;
+        }
+
+        ChatGui.PrintError(message, "RollTracker");
+        return true;
     }
 
     private void ToggleMainUi()
@@ -188,5 +244,15 @@ public sealed class Plugin : IDalamudPlugin
     private void SaveConfiguration()
     {
         PluginInterface.SavePluginConfig(Configuration);
+    }
+
+    private void MigrateConfiguration()
+    {
+        if (Configuration.ResultCommandTemplate.Equals("/y \"{highest}\">\"{lowest}\"", StringComparison.OrdinalIgnoreCase) ||
+            Configuration.ResultCommandTemplate.Equals("/y \"{highest}\">>>\"{lowest}\"", StringComparison.OrdinalIgnoreCase))
+        {
+            Configuration.ResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})";
+            SaveConfiguration();
+        }
     }
 }
