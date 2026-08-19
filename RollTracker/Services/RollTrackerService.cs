@@ -22,6 +22,7 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly List<RollEntry> rolls = [];
     private readonly Queue<MacroStep> pendingMacroSteps = [];
     private readonly Queue<MacroStep> pendingWifiMacroSteps = [];
+    private readonly Queue<DelayedCommand> pendingTodPromptCommands = [];
     private readonly HashSet<uint> housingInteriorTerritoryIds;
     private readonly List<string> worldNames;
 
@@ -127,8 +128,16 @@ internal sealed partial class RollTrackerService : IDisposable
             .Replace("{lowestRoll}", lowest.Value.ToString(), StringComparison.OrdinalIgnoreCase);
 
         var specialRuleText = BuildTodSpecialRuleText(highest, lowest);
-        var secondPairText = BuildTodSecondPairText(highest, lowest);
-        var extraText = string.Join(' ', new[] { secondPairText, specialRuleText }.Where(text => !string.IsNullOrWhiteSpace(text)));
+        var secondPairText = string.Empty;
+        var secondPairSpecialRuleText = string.Empty;
+
+        if (TryGetTodSecondPair(highest, lowest, out var secondHighest, out var secondLowest))
+        {
+            secondPairText = BuildTodSecondPairText(secondHighest, secondLowest);
+            secondPairSpecialRuleText = BuildTodSpecialRuleText(secondHighest, secondLowest);
+        }
+
+        var extraText = string.Join(' ', new[] { secondPairText, specialRuleText, secondPairSpecialRuleText }.Where(text => !string.IsNullOrWhiteSpace(text)));
 
         return string.IsNullOrWhiteSpace(extraText)
             ? result
@@ -155,29 +164,44 @@ internal sealed partial class RollTrackerService : IDisposable
         return string.Empty;
     }
 
-    private string BuildTodSecondPairText(RollEntry highest, RollEntry lowest)
+    private bool TryGetTodSecondPair(
+        RollEntry highest,
+        RollEntry lowest,
+        out RollEntry secondHighest,
+        out RollEntry secondLowest)
     {
         if (!configuration.TodSecondPairEnabled || rolls.Count < 4)
         {
-            return string.Empty;
+            secondHighest = null!;
+            secondLowest = null!;
+            return false;
         }
 
-        var secondHighest = rolls
+        var secondHighestCandidate = rolls
             .OrderByDescending(roll => roll.Value)
             .ThenBy(roll => roll.Time)
             .FirstOrDefault(roll => !ReferenceEquals(roll, highest));
-        var secondLowest = rolls
+        var secondLowestCandidate = rolls
             .OrderBy(roll => roll.Value)
             .ThenBy(roll => roll.Time)
             .FirstOrDefault(roll => !ReferenceEquals(roll, lowest));
 
-        if (secondHighest is null ||
-            secondLowest is null ||
-            ReferenceEquals(secondHighest, secondLowest))
+        if (secondHighestCandidate is null ||
+            secondLowestCandidate is null ||
+            ReferenceEquals(secondHighestCandidate, secondLowestCandidate))
         {
-            return string.Empty;
+            secondHighest = null!;
+            secondLowest = null!;
+            return false;
         }
 
+        secondHighest = secondHighestCandidate;
+        secondLowest = secondLowestCandidate;
+        return true;
+    }
+
+    private static string BuildTodSecondPairText(RollEntry secondHighest, RollEntry secondLowest)
+    {
         return $"2nd: \"{secondHighest.PlayerName}\"({secondHighest.Value})>>>\"{secondLowest.PlayerName}\"({secondLowest.Value})";
     }
 
@@ -224,6 +248,7 @@ internal sealed partial class RollTrackerService : IDisposable
         {
             roundEndsAt = null;
             pendingMacroSteps.Clear();
+            pendingTodPromptCommands.Clear();
         }
 
         chatGui.Print($"RollTracker {(enabled ? "enabled" : "disabled")}.", "RollTracker");
@@ -246,6 +271,7 @@ internal sealed partial class RollTrackerService : IDisposable
             roundEndsAt = null;
             pendingMacroSteps.Clear();
             pendingWifiMacroSteps.Clear();
+            pendingTodPromptCommands.Clear();
         }
 
         chatGui.Print($"RollTracker modules {(enabled ? "enabled" : "disabled")}.", "RollTracker");
@@ -442,6 +468,11 @@ internal sealed partial class RollTrackerService : IDisposable
             ExecuteNextWifiMacroStep();
         }
 
+        if (configuration.Enabled && pendingTodPromptCommands.Count > 0 && now >= pendingTodPromptCommands.Peek().ExecuteAt)
+        {
+            ExecuteNextTodPromptCommand();
+        }
+
         if (configuration.Enabled && roundEndsAt is not null && now >= roundEndsAt.Value)
         {
             FinishRoundAndReset();
@@ -462,6 +493,7 @@ internal sealed partial class RollTrackerService : IDisposable
             roundEndsAt = null;
             pendingMacroSteps.Clear();
             pendingWifiMacroSteps.Clear();
+            pendingTodPromptCommands.Clear();
             saveConfiguration();
             chatGui.Print("RollTracker disabled because you left the house.", "RollTracker");
         }
@@ -538,6 +570,15 @@ internal sealed partial class RollTrackerService : IDisposable
         nextWifiMacroStepAt = DateTimeOffset.Now.AddMilliseconds(Math.Clamp(configuration.MacroLineDelayMilliseconds, 100, 10000));
     }
 
+    private void ExecuteNextTodPromptCommand()
+    {
+        var delayedCommand = pendingTodPromptCommands.Dequeue();
+        if (!TryExecuteTextCommand(delayedCommand.Command))
+        {
+            chatGui.PrintError($"Could not send {delayedCommand.PromptType} prompt.", "RollTracker");
+        }
+    }
+
     private static MacroStep ParseMacroStep(string line)
     {
         if (line.StartsWith("/wait ", StringComparison.OrdinalIgnoreCase) &&
@@ -603,10 +644,10 @@ internal sealed partial class RollTrackerService : IDisposable
         }
 
         var prompt = usablePrompts[Random.Shared.Next(usablePrompts.Count)];
-        if (!TryExecuteTextCommand($"{GetChatCommand(configuration.TodPromptChatChannel)} {promptType}: {prompt}"))
-        {
-            chatGui.PrintError($"Could not send {promptType} prompt.", "RollTracker");
-        }
+        pendingTodPromptCommands.Enqueue(new DelayedCommand(
+            $"{GetChatCommand(configuration.TodPromptChatChannel)} {promptType}: {prompt}",
+            promptType,
+            DateTimeOffset.Now.AddMilliseconds(500)));
     }
 
     private static bool IsRoundEndMarker(string message)
@@ -772,4 +813,6 @@ internal sealed partial class RollTrackerService : IDisposable
     private static partial Regex YouRollRegex();
 
     private readonly record struct MacroStep(string Command, int WaitMilliseconds);
+
+    private readonly record struct DelayedCommand(string Command, string PromptType, DateTimeOffset ExecuteAt);
 }
