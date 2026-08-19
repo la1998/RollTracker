@@ -142,19 +142,17 @@ internal sealed partial class RollTrackerService : IDisposable
             return string.Empty;
         }
 
-        var messages = new List<string>();
-
         if (lowest.Value is 0 or 1)
         {
-            messages.Add($"{lowest.PlayerName} gets asked Truth and Dare.");
+            return $"{lowest.PlayerName} gets asked Truth and Dare.";
         }
 
         if (highest.Value == 999)
         {
-            messages.Add($"{highest.PlayerName} can ask both Truth and Dare.");
+            return $"{highest.PlayerName} can ask both Truth and Dare.";
         }
 
-        return string.Join(' ', messages);
+        return string.Empty;
     }
 
     private string BuildTodSecondPairText(RollEntry highest, RollEntry lowest)
