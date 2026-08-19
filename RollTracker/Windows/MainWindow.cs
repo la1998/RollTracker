@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
@@ -42,6 +43,12 @@ internal sealed class MainWindow : Window, IDisposable
         if (ImGui.BeginTabItem("Truth or Dare"))
         {
             DrawTruthOrDareTab();
+            ImGui.EndTabItem();
+        }
+
+        if (ImGui.BeginTabItem("Truth / Dare"))
+        {
+            DrawTruthDarePromptTab();
             ImGui.EndTabItem();
         }
 
@@ -152,30 +159,86 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.EndTable();
     }
 
+    private string newTruthPrompt = string.Empty;
+    private string newDarePrompt = string.Empty;
+
+    private void DrawTruthDarePromptTab()
+    {
+        ImGui.TextUnformatted(configuration.Enabled
+            ? "!truth and !dare are active"
+            : "!truth and !dare are inactive");
+
+        DrawChatChannelCombo("Chat", configuration.TodPromptChatChannel, channel => configuration.TodPromptChatChannel = channel);
+
+        ImGui.Separator();
+
+        if (ImGui.BeginTabBar("RollTrackerPromptTabs"))
+        {
+            if (ImGui.BeginTabItem("Truths"))
+            {
+                DrawPromptList("Truth", configuration.TruthPrompts, ref newTruthPrompt);
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Dares"))
+            {
+                DrawPromptList("Dare", configuration.DarePrompts, ref newDarePrompt);
+                ImGui.EndTabItem();
+            }
+
+            ImGui.EndTabBar();
+        }
+    }
+
+    private void DrawPromptList(string label, List<string> prompts, ref string newPrompt)
+    {
+        ImGui.TextUnformatted($"{label}s: {prompts.Count}");
+        ImGui.Spacing();
+
+        for (var i = 0; i < prompts.Count; i++)
+        {
+            ImGui.PushID($"{label}{i}");
+
+            if (ImGui.Button("Delete"))
+            {
+                prompts.RemoveAt(i);
+                saveConfiguration();
+                ImGui.PopID();
+                i--;
+                continue;
+            }
+
+            ImGui.SameLine();
+
+            var prompt = prompts[i];
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.InputText("##Prompt", ref prompt, 1024))
+            {
+                prompts[i] = prompt;
+                saveConfiguration();
+            }
+
+            ImGui.PopID();
+        }
+
+        ImGui.Separator();
+
+        ImGui.SetNextItemWidth(-1);
+        ImGui.InputText($"New {label}", ref newPrompt, 1024);
+
+        if (ImGui.Button($"Add {label}") && !string.IsNullOrWhiteSpace(newPrompt))
+        {
+            prompts.Add(newPrompt.Trim());
+            newPrompt = string.Empty;
+            saveConfiguration();
+        }
+    }
+
     private void DrawWifiTab()
     {
         ImGui.TextUnformatted(rollTrackerService.IsWifiMacroRunning ? "Macro: running" : "Macro: idle");
 
-        var channel = configuration.WifiChatChannel;
-        if (ImGui.BeginCombo("Chat", channel))
-        {
-            foreach (var option in new[] { "Yell", "Say", "Party" })
-            {
-                var selected = channel.Equals(option, StringComparison.OrdinalIgnoreCase);
-                if (ImGui.Selectable(option, selected))
-                {
-                    configuration.WifiChatChannel = option;
-                    saveConfiguration();
-                }
-
-                if (selected)
-                {
-                    ImGui.SetItemDefaultFocus();
-                }
-            }
-
-            ImGui.EndCombo();
-        }
+        DrawChatChannelCombo("Chat", configuration.WifiChatChannel, channel => configuration.WifiChatChannel = channel);
 
         var wifiMacroText = configuration.WifiMacroText;
         if (ImGui.InputTextMultiline("Macro##Wifi", ref wifiMacroText, 4096, new Vector2(0, 170 * ImGuiHelpers.GlobalScale)))
@@ -187,6 +250,29 @@ internal sealed class MainWindow : Window, IDisposable
         if (ImGui.Button("Run !wifi"))
         {
             rollTrackerService.StartWifiMacro("manual");
+        }
+    }
+
+    private void DrawChatChannelCombo(string label, string channel, Action<string> setChannel)
+    {
+        if (ImGui.BeginCombo("Chat", channel))
+        {
+            foreach (var option in new[] { "Yell", "Say", "Party" })
+            {
+                var selected = channel.Equals(option, StringComparison.OrdinalIgnoreCase);
+                if (ImGui.Selectable(option, selected))
+                {
+                    setChannel(option);
+                    saveConfiguration();
+                }
+
+                if (selected)
+                {
+                    ImGui.SetItemDefaultFocus();
+                }
+            }
+
+            ImGui.EndCombo();
         }
     }
 

@@ -34,11 +34,15 @@ https://raw.githubusercontent.com/la1998/RollTracker/main/repo.json
 
 These commands are also listed in the Dalamud plugin installer description and in Dalamud command help.
 
+When Truth or Dare is enabled, chat triggers `!truth` and `!dare` are also active. They ignore casing and send one random entry from the configured Truth or Dare lists to the selected chat channel.
+
 The window also has `Auto off outside house`. When enabled, RollTracker turns itself off automatically when you leave a housing interior.
 
-The result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. ToD special rules are enabled by default and can be disabled in `Settings`; when enabled, rolls of 0 or 1 add `Lowest gets asked Truth and Dare.`, while a highest roll of 999 adds `Highest can ask both Truth and Dare.`. The second pair option is disabled by default; when enabled and at least four people rolled, the result also adds the second-highest to second-lowest pair.
+The result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. ToD special rules are enabled by default and can be disabled in `Settings`; when enabled, rolls of 0 or 1 add `<name> gets asked Truth and Dare.`, while a highest roll of 999 adds `<name> can ask both Truth and Dare.`. The second pair option is disabled by default; when enabled and at least four people rolled, the result also adds the second-highest to second-lowest pair.
 
 `!wifi` is a separate trigger with its own tab, enabled switch, macro text, and chat target. It can send to Yell, Say, or Party and is also turned off automatically when you leave a housing interior.
+
+The `Truth / Dare` tab lets you choose the chat channel and add, edit, and delete the prompt lists used by `!truth` and `!dare`. Truth and Dare prompts include default starter lists.
 
 The `Settings` tab contains `Enable ToD`, `Enable ToD special rules`, `Enable ToD second pair`, `Enable Wifi`, `Auto off outside house`, and quick buttons to enable or disable all modules.
 

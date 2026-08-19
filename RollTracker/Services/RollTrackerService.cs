@@ -146,12 +146,12 @@ internal sealed partial class RollTrackerService : IDisposable
 
         if (lowest.Value is 0 or 1)
         {
-            messages.Add("Lowest gets asked Truth and Dare.");
+            messages.Add($"{lowest.PlayerName} gets asked Truth and Dare.");
         }
 
         if (highest.Value == 999)
         {
-            messages.Add("Highest can ask both Truth and Dare.");
+            messages.Add($"{highest.PlayerName} can ask both Truth and Dare.");
         }
 
         return string.Join(' ', messages);
@@ -326,6 +326,18 @@ internal sealed partial class RollTrackerService : IDisposable
 
         if (!configuration.Enabled)
         {
+            return;
+        }
+
+        if (IsTruthTrigger(message))
+        {
+            SendRandomTodPrompt("Truth", configuration.TruthPrompts);
+            return;
+        }
+
+        if (IsDareTrigger(message))
+        {
+            SendRandomTodPrompt("Dare", configuration.DarePrompts);
             return;
         }
 
@@ -579,9 +591,39 @@ internal sealed partial class RollTrackerService : IDisposable
         }
     }
 
+    private void SendRandomTodPrompt(string promptType, IReadOnlyList<string> prompts)
+    {
+        var usablePrompts = prompts
+            .Select(prompt => prompt.Trim())
+            .Where(prompt => !string.IsNullOrWhiteSpace(prompt))
+            .ToList();
+
+        if (usablePrompts.Count == 0)
+        {
+            chatGui.PrintError($"No {promptType} prompts configured.", "RollTracker");
+            return;
+        }
+
+        var prompt = usablePrompts[Random.Shared.Next(usablePrompts.Count)];
+        if (!TryExecuteTextCommand($"{GetChatCommand(configuration.TodPromptChatChannel)} {promptType}: {prompt}"))
+        {
+            chatGui.PrintError($"Could not send {promptType} prompt.", "RollTracker");
+        }
+    }
+
     private static bool IsRoundEndMarker(string message)
     {
         return message.Equals("!tod", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsTruthTrigger(string message)
+    {
+        return message.Equals("!truth", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDareTrigger(string message)
+    {
+        return message.Equals("!dare", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsWifiTrigger(string message)
