@@ -12,6 +12,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 {
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.32", "Simplified ToD special rules to use only Do not trigger with."),
         new("0.1.0.31", "Added repository cache-busting metadata for testing updates."),
         new("0.1.0.30", "Added Always shown and Do not trigger with controls for ToD special rules."),
         new("0.1.0.29", "Fixed duplicate default Special Rules after loading saved configuration."),

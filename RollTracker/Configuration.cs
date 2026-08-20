@@ -45,9 +45,9 @@ public sealed class Configuration : IPluginConfiguration
 
     public List<TodSpecialRule> TodSpecialRules { get; set; } =
     [
-        new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare.", StopPairAfterMatch = true },
-        new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare.", StopPairAfterMatch = true },
-        new TodSpecialRule { Roll = 999, Text = "{player} can ask both Truth and Dare." },
+        new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare." },
+        new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare." },
+        new TodSpecialRule { Roll = 999, Text = "{player} can ask both Truth and Dare.", DoNotTriggerWith = "0, 1" },
     ];
 
     public List<string> TruthPrompts { get; set; } =
@@ -122,10 +122,6 @@ public sealed class TodSpecialRule
     public int Roll { get; set; }
 
     public string Text { get; set; } = string.Empty;
-
-    public bool StopPairAfterMatch { get; set; }
-
-    public bool AlwaysShown { get; set; }
 
     public string DoNotTriggerWith { get; set; } = string.Empty;
 }

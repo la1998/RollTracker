@@ -195,8 +195,6 @@ internal sealed class MainWindow : Window, IDisposable
     private string newDarePrompt = string.Empty;
     private int newSpecialRuleRoll;
     private string newSpecialRuleText = string.Empty;
-    private bool newSpecialRuleStopsPair;
-    private bool newSpecialRuleAlwaysShown;
     private string newSpecialRuleDoNotTriggerWith = string.Empty;
 
     private void DrawTruthDarePromptTab()
@@ -280,19 +278,17 @@ internal sealed class MainWindow : Window, IDisposable
             saveConfiguration();
         }
 
-        ImGui.TextWrapped("Placeholders: {player}, {roll}, {role}. Always shown bypasses Stop pair from another matching rule. Do not trigger with accepts numbers separated by commas or spaces.");
+        ImGui.TextWrapped("Placeholders: {player}, {roll}, {role}. Do not trigger with accepts numbers separated by commas or spaces.");
         ImGui.Separator();
 
         var tableFlags = ImGuiTableFlags.Borders |
                          ImGuiTableFlags.RowBg |
                          ImGuiTableFlags.SizingStretchProp;
 
-        if (ImGui.BeginTable("RollTrackerSpecialRulesTable", 6, tableFlags))
+        if (ImGui.BeginTable("RollTrackerSpecialRulesTable", 4, tableFlags))
         {
             ImGui.TableSetupColumn("Roll", ImGuiTableColumnFlags.WidthFixed, 80 * ImGuiHelpers.GlobalScale);
             ImGui.TableSetupColumn("Text");
-            ImGui.TableSetupColumn("Always", ImGuiTableColumnFlags.WidthFixed, 70 * ImGuiHelpers.GlobalScale);
-            ImGui.TableSetupColumn("Stop", ImGuiTableColumnFlags.WidthFixed, 58 * ImGuiHelpers.GlobalScale);
             ImGui.TableSetupColumn("Do not trigger with", ImGuiTableColumnFlags.WidthFixed, 140 * ImGuiHelpers.GlobalScale);
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 75 * ImGuiHelpers.GlobalScale);
             ImGui.TableHeadersRow();
@@ -317,22 +313,6 @@ internal sealed class MainWindow : Window, IDisposable
                 if (ImGui.InputText("##Text", ref text, 1024))
                 {
                     configuration.TodSpecialRules[i].Text = text;
-                    saveConfiguration();
-                }
-
-                ImGui.TableNextColumn();
-                var alwaysShown = configuration.TodSpecialRules[i].AlwaysShown;
-                if (ImGui.Checkbox("##AlwaysShown", ref alwaysShown))
-                {
-                    configuration.TodSpecialRules[i].AlwaysShown = alwaysShown;
-                    saveConfiguration();
-                }
-
-                ImGui.TableNextColumn();
-                var stopPairAfterMatch = configuration.TodSpecialRules[i].StopPairAfterMatch;
-                if (ImGui.Checkbox("##StopPair", ref stopPairAfterMatch))
-                {
-                    configuration.TodSpecialRules[i].StopPairAfterMatch = stopPairAfterMatch;
                     saveConfiguration();
                 }
 
@@ -369,10 +349,6 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.SetNextItemWidth(-1);
         ImGui.InputText("New text", ref newSpecialRuleText, 1024);
 
-        ImGui.Checkbox("New rule is always shown", ref newSpecialRuleAlwaysShown);
-        ImGui.SameLine();
-        ImGui.Checkbox("New rule stops pair", ref newSpecialRuleStopsPair);
-
         ImGui.SetNextItemWidth(-1);
         ImGui.InputText("New rule do not trigger with", ref newSpecialRuleDoNotTriggerWith, 256);
 
@@ -382,13 +358,9 @@ internal sealed class MainWindow : Window, IDisposable
             {
                 Roll = newSpecialRuleRoll,
                 Text = newSpecialRuleText.Trim(),
-                StopPairAfterMatch = newSpecialRuleStopsPair,
-                AlwaysShown = newSpecialRuleAlwaysShown,
                 DoNotTriggerWith = newSpecialRuleDoNotTriggerWith.Trim(),
             });
             newSpecialRuleText = string.Empty;
-            newSpecialRuleStopsPair = false;
-            newSpecialRuleAlwaysShown = false;
             newSpecialRuleDoNotTriggerWith = string.Empty;
             saveConfiguration();
         }

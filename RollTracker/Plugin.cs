@@ -323,19 +323,19 @@ public sealed class Plugin : IDalamudPlugin
 
         if (Configuration.TodSpecialRules.Count == 0)
         {
-            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare.", StopPairAfterMatch = true });
-            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare.", StopPairAfterMatch = true });
-            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 999, Text = "{player} can ask both Truth and Dare." });
+            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare." });
+            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare." });
+            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 999, Text = "{player} can ask both Truth and Dare.", DoNotTriggerWith = "0, 1" });
             changedSpecialRules = true;
         }
 
         foreach (var rule in Configuration.TodSpecialRules)
         {
-            if (rule.Roll is 0 or 1 &&
-                !rule.StopPairAfterMatch &&
-                rule.Text.Equals("{player} gets asked Truth and Dare.", StringComparison.Ordinal))
+            if (rule.Roll == 999 &&
+                string.IsNullOrWhiteSpace(rule.DoNotTriggerWith) &&
+                rule.Text.Equals("{player} can ask both Truth and Dare.", StringComparison.Ordinal))
             {
-                rule.StopPairAfterMatch = true;
+                rule.DoNotTriggerWith = "0, 1";
                 changedSpecialRules = true;
             }
         }
@@ -359,8 +359,6 @@ public sealed class Plugin : IDalamudPlugin
                 continue;
             }
 
-            Configuration.TodSpecialRules[duplicateIndex].StopPairAfterMatch |= Configuration.TodSpecialRules[i].StopPairAfterMatch;
-            Configuration.TodSpecialRules[duplicateIndex].AlwaysShown |= Configuration.TodSpecialRules[i].AlwaysShown;
             Configuration.TodSpecialRules[duplicateIndex].DoNotTriggerWith = MergeRollLists(
                 Configuration.TodSpecialRules[duplicateIndex].DoNotTriggerWith,
                 Configuration.TodSpecialRules[i].DoNotTriggerWith);

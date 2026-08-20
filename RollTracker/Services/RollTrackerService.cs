@@ -276,46 +276,33 @@ internal sealed partial class RollTrackerService : IDisposable
         var pairRolls = ReferenceEquals(highest, lowest)
             ? [lowest.Value]
             : new[] { lowest.Value, highest.Value };
-        var lowestRules = BuildSpecialRuleMatchesForRoll(lowest, "lowest", pairRolls);
-        specialRuleTexts.AddRange(lowestRules.Select(rule => rule.Text));
+        specialRuleTexts.AddRange(BuildSpecialRuleTextsForRoll(lowest, "lowest", pairRolls));
 
         if (ReferenceEquals(highest, lowest))
         {
             return specialRuleTexts;
         }
 
-        var highestRules = BuildSpecialRuleMatchesForRoll(highest, "highest", pairRolls);
-        var stopAfterLowest = lowestRules.Any(rule => rule.StopPairAfterMatch);
-        if (stopAfterLowest)
-        {
-            specialRuleTexts.AddRange(highestRules
-                .Where(rule => rule.AlwaysShown)
-                .Select(rule => rule.Text));
-            return specialRuleTexts;
-        }
-
-        specialRuleTexts.AddRange(highestRules.Select(rule => rule.Text));
+        specialRuleTexts.AddRange(BuildSpecialRuleTextsForRoll(highest, "highest", pairRolls));
         return specialRuleTexts;
     }
 
-    private List<SpecialRuleMatch> BuildSpecialRuleMatchesForRoll(RollEntry roll, string role, IReadOnlyCollection<int> pairRolls)
+    private List<string> BuildSpecialRuleTextsForRoll(RollEntry roll, string role, IReadOnlyCollection<int> pairRolls)
     {
         return configuration.TodSpecialRules
             .Where(rule => rule.Roll == roll.Value)
             .Where(rule => !ShouldSkipSpecialRule(rule, pairRolls))
-            .Select(rule => BuildSpecialRuleMatch(rule, roll, role))
-            .Where(rule => !string.IsNullOrWhiteSpace(rule.Text))
+            .Select(rule => BuildSpecialRuleText(rule, roll, role))
+            .Where(text => !string.IsNullOrWhiteSpace(text))
             .ToList();
     }
 
-    private static SpecialRuleMatch BuildSpecialRuleMatch(TodSpecialRule rule, RollEntry roll, string role)
+    private static string BuildSpecialRuleText(TodSpecialRule rule, RollEntry roll, string role)
     {
-        var text = rule.Text.Trim()
+        return rule.Text.Trim()
             .Replace("{player}", roll.PlayerName, StringComparison.OrdinalIgnoreCase)
             .Replace("{roll}", roll.Value.ToString(), StringComparison.OrdinalIgnoreCase)
             .Replace("{role}", role, StringComparison.OrdinalIgnoreCase);
-
-        return new SpecialRuleMatch(text, rule.StopPairAfterMatch, rule.AlwaysShown);
     }
 
     private static bool ShouldSkipSpecialRule(TodSpecialRule rule, IReadOnlyCollection<int> pairRolls)
@@ -1168,8 +1155,6 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly record struct MacroStep(string Command, int WaitMilliseconds);
 
     private readonly record struct DelayedCommand(string Command, string PromptType, DateTimeOffset ExecuteAt);
-
-    private readonly record struct SpecialRuleMatch(string Text, bool StopPairAfterMatch, bool AlwaysShown);
 
     private enum RoundKind
     {
