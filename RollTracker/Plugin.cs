@@ -315,9 +315,26 @@ public sealed class Plugin : IDalamudPlugin
         if (Configuration.TodSpecialRules is null || Configuration.TodSpecialRules.Count == 0)
         {
             Configuration.TodSpecialRules = [];
-            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare." });
-            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare." });
+            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare.", StopPairAfterMatch = true });
+            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare.", StopPairAfterMatch = true });
             Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 999, Text = "{player} can ask both Truth and Dare." });
+            SaveConfiguration();
+        }
+
+        var changedSpecialRules = false;
+        foreach (var rule in Configuration.TodSpecialRules)
+        {
+            if (rule.Roll is 0 or 1 &&
+                !rule.StopPairAfterMatch &&
+                rule.Text.Equals("{player} gets asked Truth and Dare.", StringComparison.Ordinal))
+            {
+                rule.StopPairAfterMatch = true;
+                changedSpecialRules = true;
+            }
+        }
+
+        if (changedSpecialRules)
+        {
             SaveConfiguration();
         }
     }

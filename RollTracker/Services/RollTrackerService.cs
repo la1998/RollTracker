@@ -273,14 +273,14 @@ internal sealed partial class RollTrackerService : IDisposable
         }
 
         var specialRuleTexts = new List<string>();
-        AppendSpecialRuleTextsForRoll(specialRuleTexts, lowest, "lowest");
+        var stopAfterLowest = AppendSpecialRuleTextsForRoll(specialRuleTexts, lowest, "lowest");
 
         if (ReferenceEquals(highest, lowest))
         {
             return specialRuleTexts;
         }
 
-        if (lowest.Value is 0 or 1)
+        if (stopAfterLowest)
         {
             return specialRuleTexts;
         }
@@ -289,8 +289,9 @@ internal sealed partial class RollTrackerService : IDisposable
         return specialRuleTexts;
     }
 
-    private void AppendSpecialRuleTextsForRoll(List<string> specialRuleTexts, RollEntry roll, string role)
+    private bool AppendSpecialRuleTextsForRoll(List<string> specialRuleTexts, RollEntry roll, string role)
     {
+        var shouldStopPair = false;
         foreach (var rule in configuration.TodSpecialRules.Where(rule => rule.Roll == roll.Value))
         {
             var text = rule.Text.Trim();
@@ -303,7 +304,10 @@ internal sealed partial class RollTrackerService : IDisposable
                 .Replace("{player}", roll.PlayerName, StringComparison.OrdinalIgnoreCase)
                 .Replace("{roll}", roll.Value.ToString(), StringComparison.OrdinalIgnoreCase)
                 .Replace("{role}", role, StringComparison.OrdinalIgnoreCase));
+            shouldStopPair |= rule.StopPairAfterMatch;
         }
+
+        return shouldStopPair;
     }
 
     private bool TryGetTodSecondPair(
