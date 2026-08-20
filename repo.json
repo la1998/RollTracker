@@ -3,7 +3,7 @@
     "Author": "Arty",
     "Name": "RollTracker",
     "InternalName": "RollTracker",
-    "AssemblyVersion": "0.1.0.19",
+    "AssemblyVersion": "0.1.0.26",
     "TestingAssemblyVersion": "0.1.0.26",
     "TestingDalamudApiLevel": 15,
     "TestingChangelog": "Testing build with an update changelog popup.",
