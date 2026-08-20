@@ -311,6 +311,15 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.ResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})";
             SaveConfiguration();
         }
+
+        if (Configuration.TodSpecialRules is null || Configuration.TodSpecialRules.Count == 0)
+        {
+            Configuration.TodSpecialRules = [];
+            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare." });
+            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare." });
+            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 999, Text = "{player} can ask both Truth and Dare." });
+            SaveConfiguration();
+        }
     }
 
     private static string GetPluginVersion()

@@ -43,6 +43,13 @@ public sealed class Configuration : IPluginConfiguration
 
     public string HelpChatChannel { get; set; } = "Yell";
 
+    public List<TodSpecialRule> TodSpecialRules { get; set; } =
+    [
+        new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare." },
+        new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare." },
+        new TodSpecialRule { Roll = 999, Text = "{player} can ask both Truth and Dare." },
+    ];
+
     public List<string> TruthPrompts { get; set; } =
     [
         "Anyone here whose design, or kinks they mentioned, makes you curious about them?",
@@ -108,4 +115,11 @@ public sealed class Configuration : IPluginConfiguration
     public string WifiChatChannel { get; set; } = "Yell";
 
     public string WifiMacroText { get; set; } = "KinkHouse Shells and Discord:\nLightless - our main sync:\nID: LLS-SWN693A68P5R  PW: KinkHausOCE\n\nPlayerSync - our optional/backup sync:\nID: MSS-6AC6326WFU4P  PW: KinkHausOCE\n\nDiscord:\nhttps://discord.gg/7N7xaghGTr";
+}
+
+public sealed class TodSpecialRule
+{
+    public int Roll { get; set; }
+
+    public string Text { get; set; } = string.Empty;
 }

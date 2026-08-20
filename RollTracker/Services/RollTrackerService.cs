@@ -138,7 +138,7 @@ internal sealed partial class RollTrackerService : IDisposable
 
         var resultCommands = currentRoundKind == RoundKind.SecondPair
             ? BuildSecondPairResultCommands(highest, lowest)
-            : [BuildResultCommand(highest, lowest)];
+            : BuildResultCommands(highest, lowest);
         var anyCommandFailed = false;
         foreach (var resultCommand in resultCommands)
         {
@@ -157,30 +157,33 @@ internal sealed partial class RollTrackerService : IDisposable
         currentRoundKind = RoundKind.Normal;
     }
 
+    private List<string> BuildResultCommands(RollEntry highest, RollEntry lowest)
+    {
+        var resultCommand = BuildResultCommand(highest, lowest);
+        var resultCommands = SplitCommandLines(resultCommand);
+        if (resultCommands.Count == 0)
+        {
+            resultCommands.Add(BuildResultCommandFromTemplate(DefaultResultCommandTemplate, highest, lowest));
+        }
+
+        AppendSpecialRuleCommands(resultCommands, 0, BuildTodSpecialRuleTexts(highest, lowest));
+        return resultCommands;
+    }
+
     private string BuildResultCommand(RollEntry highest, RollEntry lowest)
     {
         var template = string.IsNullOrWhiteSpace(configuration.ResultCommandTemplate)
             ? DefaultResultCommandTemplate
             : configuration.ResultCommandTemplate;
 
-        var result = template
-            .Replace("{highest}", highest.PlayerName, StringComparison.OrdinalIgnoreCase)
-            .Replace("{lowest}", lowest.PlayerName, StringComparison.OrdinalIgnoreCase)
-            .Replace("{highestRoll}", highest.Value.ToString(), StringComparison.OrdinalIgnoreCase)
-            .Replace("{lowestRoll}", lowest.Value.ToString(), StringComparison.OrdinalIgnoreCase);
-
-        var specialRuleText = BuildTodSpecialRuleText(highest, lowest);
-
-        return string.IsNullOrWhiteSpace(specialRuleText)
-            ? result
-            : $"{result} {specialRuleText}";
+        return BuildResultCommandFromTemplate(template, highest, lowest);
     }
 
     private List<string> BuildSecondPairResultCommands(RollEntry highest, RollEntry lowest)
     {
         if (!TryGetTodSecondPair(highest, lowest, out var secondHighest, out var secondLowest))
         {
-            return [BuildResultCommand(highest, lowest)];
+            return BuildResultCommands(highest, lowest);
         }
 
         var template = string.IsNullOrWhiteSpace(configuration.TodSecondPairResultCommandTemplate)
@@ -204,21 +207,30 @@ internal sealed partial class RollTrackerService : IDisposable
         var resultCommands = SplitCommandLines(result);
         if (resultCommands.Count == 0)
         {
-            return [BuildResultCommand(highest, lowest)];
+            return BuildResultCommands(highest, lowest);
         }
 
-        AppendSpecialRuleText(resultCommands, 0, BuildTodSpecialRuleText(highest, lowest));
+        AppendSpecialRuleCommands(resultCommands, 0, BuildTodSpecialRuleTexts(highest, lowest));
 
         if (resultCommands.Count > 1)
         {
-            AppendSpecialRuleText(resultCommands, 1, BuildTodSpecialRuleText(secondHighest, secondLowest));
+            AppendSpecialRuleCommands(resultCommands, 1, BuildTodSpecialRuleTexts(secondHighest, secondLowest));
         }
         else
         {
-            AppendSpecialRuleText(resultCommands, 0, BuildTodSpecialRuleText(secondHighest, secondLowest));
+            AppendSpecialRuleCommands(resultCommands, 0, BuildTodSpecialRuleTexts(secondHighest, secondLowest));
         }
 
         return resultCommands;
+    }
+
+    private static string BuildResultCommandFromTemplate(string template, RollEntry highest, RollEntry lowest)
+    {
+        return template
+            .Replace("{highest}", highest.PlayerName, StringComparison.OrdinalIgnoreCase)
+            .Replace("{lowest}", lowest.PlayerName, StringComparison.OrdinalIgnoreCase)
+            .Replace("{highestRoll}", highest.Value.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{lowestRoll}", lowest.Value.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     private static List<string> SplitCommandLines(string commandText)
@@ -229,34 +241,69 @@ internal sealed partial class RollTrackerService : IDisposable
             .ToList();
     }
 
-    private static void AppendSpecialRuleText(List<string> commands, int commandIndex, string specialRuleText)
+    private static void AppendSpecialRuleCommands(List<string> commands, int sourceCommandIndex, IEnumerable<string> specialRuleTexts)
     {
-        if (string.IsNullOrWhiteSpace(specialRuleText) || commandIndex < 0 || commandIndex >= commands.Count)
+        if (sourceCommandIndex < 0 || sourceCommandIndex >= commands.Count)
         {
             return;
         }
 
-        commands[commandIndex] = $"{commands[commandIndex]} {specialRuleText}";
+        var commandPrefix = GetCommandPrefix(commands[sourceCommandIndex]);
+        foreach (var specialRuleText in specialRuleTexts.Where(text => !string.IsNullOrWhiteSpace(text)))
+        {
+            commands.Add($"{commandPrefix} {specialRuleText}");
+        }
     }
 
-    private string BuildTodSpecialRuleText(RollEntry highest, RollEntry lowest)
+    private static string GetCommandPrefix(string command)
+    {
+        var trimmedCommand = command.Trim();
+        var firstSpaceIndex = trimmedCommand.IndexOf(' ', StringComparison.Ordinal);
+
+        return firstSpaceIndex <= 0
+            ? "/y"
+            : trimmedCommand[..firstSpaceIndex];
+    }
+
+    private List<string> BuildTodSpecialRuleTexts(RollEntry highest, RollEntry lowest)
     {
         if (!configuration.TodSpecialRulesEnabled)
         {
-            return string.Empty;
+            return [];
+        }
+
+        var specialRuleTexts = new List<string>();
+        AppendSpecialRuleTextsForRoll(specialRuleTexts, lowest, "lowest");
+
+        if (ReferenceEquals(highest, lowest))
+        {
+            return specialRuleTexts;
         }
 
         if (lowest.Value is 0 or 1)
         {
-            return $"{lowest.PlayerName} gets asked Truth and Dare.";
+            return specialRuleTexts;
         }
 
-        if (highest.Value == 999)
+        AppendSpecialRuleTextsForRoll(specialRuleTexts, highest, "highest");
+        return specialRuleTexts;
+    }
+
+    private void AppendSpecialRuleTextsForRoll(List<string> specialRuleTexts, RollEntry roll, string role)
+    {
+        foreach (var rule in configuration.TodSpecialRules.Where(rule => rule.Roll == roll.Value))
         {
-            return $"{highest.PlayerName} can ask both Truth and Dare.";
-        }
+            var text = rule.Text.Trim();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
 
-        return string.Empty;
+            specialRuleTexts.Add(text
+                .Replace("{player}", roll.PlayerName, StringComparison.OrdinalIgnoreCase)
+                .Replace("{roll}", roll.Value.ToString(), StringComparison.OrdinalIgnoreCase)
+                .Replace("{role}", role, StringComparison.OrdinalIgnoreCase));
+        }
     }
 
     private bool TryGetTodSecondPair(

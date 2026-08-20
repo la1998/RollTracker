@@ -52,6 +52,12 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.EndTabItem();
         }
 
+        if (ImGui.BeginTabItem("Special Rules"))
+        {
+            DrawSpecialRulesTab();
+            ImGui.EndTabItem();
+        }
+
         if (ImGui.BeginTabItem("!wifi"))
         {
             DrawWifiTab();
@@ -187,6 +193,8 @@ internal sealed class MainWindow : Window, IDisposable
 
     private string newTruthPrompt = string.Empty;
     private string newDarePrompt = string.Empty;
+    private int newSpecialRuleRoll;
+    private string newSpecialRuleText = string.Empty;
 
     private void DrawTruthDarePromptTab()
     {
@@ -260,6 +268,88 @@ internal sealed class MainWindow : Window, IDisposable
         }
     }
 
+    private void DrawSpecialRulesTab()
+    {
+        var todSpecialRulesEnabled = configuration.TodSpecialRulesEnabled;
+        if (ImGui.Checkbox("Enable ToD special rules", ref todSpecialRulesEnabled))
+        {
+            configuration.TodSpecialRulesEnabled = todSpecialRulesEnabled;
+            saveConfiguration();
+        }
+
+        ImGui.TextWrapped("Placeholders: {player}, {roll}, {role}");
+        ImGui.Separator();
+
+        var tableFlags = ImGuiTableFlags.Borders |
+                         ImGuiTableFlags.RowBg |
+                         ImGuiTableFlags.SizingStretchProp;
+
+        if (ImGui.BeginTable("RollTrackerSpecialRulesTable", 3, tableFlags))
+        {
+            ImGui.TableSetupColumn("Roll", ImGuiTableColumnFlags.WidthFixed, 80 * ImGuiHelpers.GlobalScale);
+            ImGui.TableSetupColumn("Text");
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 75 * ImGuiHelpers.GlobalScale);
+            ImGui.TableHeadersRow();
+
+            for (var i = 0; i < configuration.TodSpecialRules.Count; i++)
+            {
+                ImGui.PushID($"SpecialRule{i}");
+                ImGui.TableNextRow();
+
+                ImGui.TableNextColumn();
+                var roll = configuration.TodSpecialRules[i].Roll;
+                ImGui.SetNextItemWidth(-1);
+                if (ImGui.InputInt("##Roll", ref roll))
+                {
+                    configuration.TodSpecialRules[i].Roll = Math.Clamp(roll, 0, 9999);
+                    saveConfiguration();
+                }
+
+                ImGui.TableNextColumn();
+                var text = configuration.TodSpecialRules[i].Text;
+                ImGui.SetNextItemWidth(-1);
+                if (ImGui.InputText("##Text", ref text, 1024))
+                {
+                    configuration.TodSpecialRules[i].Text = text;
+                    saveConfiguration();
+                }
+
+                ImGui.TableNextColumn();
+                if (ImGui.Button("Delete"))
+                {
+                    configuration.TodSpecialRules.RemoveAt(i);
+                    saveConfiguration();
+                    ImGui.PopID();
+                    i--;
+                    continue;
+                }
+
+                ImGui.PopID();
+            }
+
+            ImGui.EndTable();
+        }
+
+        ImGui.Separator();
+        ImGui.SetNextItemWidth(90 * ImGuiHelpers.GlobalScale);
+        ImGui.InputInt("New roll", ref newSpecialRuleRoll);
+        newSpecialRuleRoll = Math.Clamp(newSpecialRuleRoll, 0, 9999);
+
+        ImGui.SetNextItemWidth(-1);
+        ImGui.InputText("New text", ref newSpecialRuleText, 1024);
+
+        if (ImGui.Button("Add rule") && !string.IsNullOrWhiteSpace(newSpecialRuleText))
+        {
+            configuration.TodSpecialRules.Add(new TodSpecialRule
+            {
+                Roll = newSpecialRuleRoll,
+                Text = newSpecialRuleText.Trim(),
+            });
+            newSpecialRuleText = string.Empty;
+            saveConfiguration();
+        }
+    }
+
     private void DrawWifiTab()
     {
         ImGui.TextUnformatted(rollTrackerService.IsWifiMacroRunning ? "Macro: running" : "Macro: idle");
@@ -308,13 +398,6 @@ internal sealed class MainWindow : Window, IDisposable
         if (ImGui.Checkbox("Enable ToD", ref todEnabled))
         {
             rollTrackerService.SetEnabled(todEnabled);
-        }
-
-        var todSpecialRulesEnabled = configuration.TodSpecialRulesEnabled;
-        if (ImGui.Checkbox("Enable ToD special rules", ref todSpecialRulesEnabled))
-        {
-            configuration.TodSpecialRulesEnabled = todSpecialRulesEnabled;
-            saveConfiguration();
         }
 
         var todSecondPairEnabled = configuration.TodSecondPairEnabled;

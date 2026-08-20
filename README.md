@@ -19,7 +19,7 @@ RollTracker publishes stable builds through `dist/RollTracker/latest.zip` and te
 To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's Experimental settings. Testing builds are offered only when `TestingAssemblyVersion` in `repo.json` is higher than the stable `AssemblyVersion`.
 
 Current stable: `0.1.0.26`
-Current testing: `0.1.0.26`
+Current testing: `0.1.0.27`
 
 ## Commands
 
@@ -62,20 +62,22 @@ When Truth or Dare is enabled, chat triggers `!truth` and `!dare` are also activ
 - `/rt on truth` and `/rt off truth` only change `!truth`. ToD still has to be enabled for `!truth` to respond in chat.
 - `/rt on dare` and `/rt off dare` only change `!dare`. ToD still has to be enabled for `!dare` to respond in chat.
 - `/rt on help` and `/rt off help` only change `!help`. `!help` lists only the `!` commands that are currently active.
-- `/rt on todrules` and `/rt off todrules` only change the 0/1/999 special result text.
+- `/rt on todrules` and `/rt off todrules` only change whether the configured Special Rules are applied.
 - `/rt on todsecond` and `/rt off todsecond` only change whether `!tod2` can start second-highest to second-lowest rounds.
 - `/rt on wifi` and `/rt off wifi` only change `!wifi`.
 - `Auto off outside house` disables ToD, `!truth`, `!dare`, `!help`, `!tod2`, and `!wifi` when you leave a housing interior.
 
 The window also has `Auto off outside house`. When enabled, RollTracker turns itself off automatically when you leave a housing interior.
 
-The normal result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. The `!tod2` result command also supports `{secondHighest}`, `{secondLowest}`, `{secondHighestRoll}`, and `{secondLowestRoll}`. Each non-empty `!tod2` result command line is sent as its own chat message, so the default result sends the highest/lowest pair and the second pair separately. ToD special rules are enabled by default and can be disabled in `Settings`; when enabled, rolls of 0 or 1 add `<name> gets asked Truth and Dare.`, while a highest roll of 999 adds `<name> can ask both Truth and Dare.`. If both happen for the same pair, only the 0/1 message is added.
+The normal result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. The `!tod2` result command also supports `{secondHighest}`, `{secondLowest}`, `{secondHighestRoll}`, and `{secondLowestRoll}`. Each non-empty `!tod2` result command line is sent as its own chat message, so the default result sends the highest/lowest pair and the second pair separately.
+
+The `Special Rules` tab lets you enable or disable special rules, edit the default rules for rolls 0, 1, and 999, and add or delete custom roll-number rules. Special rule text supports `{player}`, `{roll}`, and `{role}`. Matching rule texts are sent as separate chat messages after the normal result line instead of being appended to it.
 
 `!wifi` is a separate trigger with its own tab, enabled switch, macro text, and chat target. It can send to Yell, Say, or Party and is also turned off automatically when you leave a housing interior.
 
 The `Truth / Dare` tab lets you choose the chat channel and add, edit, and delete the prompt lists used by `!truth` and `!dare`. Truth and Dare prompts include default starter lists.
 
-The `Settings` tab contains `Enable ToD`, `Enable ToD special rules`, `Enable ToD second pair`, `Enable !truth`, `Enable !dare`, `Enable !help`, `Enable Wifi`, `Auto off outside house`, and quick buttons to enable or disable all modules.
+The `Settings` tab contains `Enable ToD`, `Enable ToD second pair`, `Enable !truth`, `Enable !dare`, `Enable !help`, `Enable Wifi`, `Auto off outside house`, and quick buttons to enable or disable all modules.
 
 After an update, RollTracker can show a small dismissible changelog window. It remembers the last version you acknowledged and only opens again when the installed plugin version changes.
 

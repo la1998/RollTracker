@@ -12,6 +12,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 {
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.27", "Added an editable Special Rules tab and sends special rule texts as separate chat messages."),
         new("0.1.0.26", "Added this update changelog popup."),
         new("0.1.0.25", "/rt on tod turns !truth and !dare on; /rt off tod leaves them unchanged."),
         new("0.1.0.24", "Added /rt tod on and /rt tod off aliases."),
