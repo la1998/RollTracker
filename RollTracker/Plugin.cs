@@ -312,16 +312,22 @@ public sealed class Plugin : IDalamudPlugin
             SaveConfiguration();
         }
 
-        if (Configuration.TodSpecialRules is null || Configuration.TodSpecialRules.Count == 0)
+        if (Configuration.TodSpecialRules is null)
         {
             Configuration.TodSpecialRules = [];
-            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare.", StopPairAfterMatch = true });
-            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare.", StopPairAfterMatch = true });
-            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 999, Text = "{player} can ask both Truth and Dare." });
             SaveConfiguration();
         }
 
-        var changedSpecialRules = false;
+        var changedSpecialRules = RemoveDuplicateSpecialRules();
+
+        if (Configuration.TodSpecialRules.Count == 0)
+        {
+            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare.", StopPairAfterMatch = true });
+            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare.", StopPairAfterMatch = true });
+            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 999, Text = "{player} can ask both Truth and Dare." });
+            changedSpecialRules = true;
+        }
+
         foreach (var rule in Configuration.TodSpecialRules)
         {
             if (rule.Roll is 0 or 1 &&
@@ -337,6 +343,27 @@ public sealed class Plugin : IDalamudPlugin
         {
             SaveConfiguration();
         }
+    }
+
+    private bool RemoveDuplicateSpecialRules()
+    {
+        var changed = false;
+        for (var i = Configuration.TodSpecialRules.Count - 1; i >= 0; i--)
+        {
+            var duplicateIndex = Configuration.TodSpecialRules.FindIndex(0, i, rule =>
+                rule.Roll == Configuration.TodSpecialRules[i].Roll &&
+                rule.Text.Equals(Configuration.TodSpecialRules[i].Text, StringComparison.Ordinal));
+            if (duplicateIndex < 0)
+            {
+                continue;
+            }
+
+            Configuration.TodSpecialRules[duplicateIndex].StopPairAfterMatch |= Configuration.TodSpecialRules[i].StopPairAfterMatch;
+            Configuration.TodSpecialRules.RemoveAt(i);
+            changed = true;
+        }
+
+        return changed;
     }
 
     private static string GetPluginVersion()
