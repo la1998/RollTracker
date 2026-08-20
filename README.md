@@ -19,14 +19,14 @@ RollTracker publishes stable builds through `dist/RollTracker/latest.zip` and te
 To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's Experimental settings. Testing builds are offered only when `TestingAssemblyVersion` in `repo.json` is higher than the stable `AssemblyVersion`.
 
 Current stable: `0.1.0.19`
-Current testing: `0.1.0.24`
+Current testing: `0.1.0.25`
 
 ## Commands
 
 - `/rt` - opens or closes the window.
 - `/rt on` - enables all modules.
 - `/rt off` - disables all modules.
-- `/rt on tod` - enables only Truth or Dare.
+- `/rt on tod` - enables Truth or Dare, `!truth`, and `!dare`.
 - `/rt off tod` - disables only Truth or Dare.
 - `/rt on todrules` - enables the Truth or Dare special result text.
 - `/rt off todrules` - disables the Truth or Dare special result text.
@@ -55,7 +55,8 @@ When Truth or Dare is enabled, chat triggers `!truth` and `!dare` are also activ
 
 - `/rt on` enables ToD, `!truth`, `!dare`, `!help`, ToD special rules, `!tod2`, and `!wifi`.
 - `/rt off` disables ToD, `!truth`, `!dare`, `!help`, ToD special rules, `!tod2`, and `!wifi`.
-- `/rt on tod` and `/rt off tod` only change ToD itself. `!truth` and `!dare` keep their own enabled or disabled state.
+- `/rt on tod` enables ToD and turns `!truth` and `!dare` on.
+- `/rt off tod` only disables ToD itself. `!truth` and `!dare` keep their own enabled or disabled state.
 - `!tod` and `!tod2` use separate macro text, duration, and result command settings.
 - `!tod2` is triggered separately and does not add second-pair output to normal `!tod` rounds.
 - `/rt on truth` and `/rt off truth` only change `!truth`. ToD still has to be enabled for `!truth` to respond in chat.
