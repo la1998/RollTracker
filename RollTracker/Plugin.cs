@@ -135,6 +135,11 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (TryHandleReversedModuleToggle(trimmedArgs))
+        {
+            return;
+        }
+
         if (trimmedArgs.Equals("status", StringComparison.OrdinalIgnoreCase))
         {
             ChatGui.Print($"RollTracker ToD is {(Configuration.Enabled ? "on" : "off")}; !truth is {(Configuration.TruthTriggerEnabled ? "on" : "off")}; !dare is {(Configuration.DareTriggerEnabled ? "on" : "off")}; !help is {(Configuration.HelpTriggerEnabled ? "on" : "off")}; ToD special rules are {(Configuration.TodSpecialRulesEnabled ? "on" : "off")}; !tod2 is {(Configuration.TodSecondPairEnabled ? "on" : "off")}; !wifi is {(Configuration.WifiEnabled ? "on" : "off")}.", "RollTracker");
@@ -226,6 +231,27 @@ public sealed class Plugin : IDalamudPlugin
         {
             RollTrackerService.SetWifiEnabled(enabled);
             return true;
+        }
+
+        return false;
+    }
+
+    private bool TryHandleReversedModuleToggle(string args)
+    {
+        var parts = args.Split(' ', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2)
+        {
+            return false;
+        }
+
+        if (parts[1].Equals("on", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryHandleModuleToggle($"on {parts[0]}", true);
+        }
+
+        if (parts[1].Equals("off", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryHandleModuleToggle($"off {parts[0]}", false);
         }
 
         return false;

@@ -331,8 +331,6 @@ internal sealed partial class RollTrackerService : IDisposable
     public void SetEnabled(bool enabled)
     {
         configuration.Enabled = enabled;
-        configuration.TruthTriggerEnabled = enabled;
-        configuration.DareTriggerEnabled = enabled;
         saveConfiguration();
 
         if (!enabled)
