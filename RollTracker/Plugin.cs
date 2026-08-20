@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
@@ -359,11 +360,29 @@ public sealed class Plugin : IDalamudPlugin
             }
 
             Configuration.TodSpecialRules[duplicateIndex].StopPairAfterMatch |= Configuration.TodSpecialRules[i].StopPairAfterMatch;
+            Configuration.TodSpecialRules[duplicateIndex].AlwaysShown |= Configuration.TodSpecialRules[i].AlwaysShown;
+            Configuration.TodSpecialRules[duplicateIndex].DoNotTriggerWith = MergeRollLists(
+                Configuration.TodSpecialRules[duplicateIndex].DoNotTriggerWith,
+                Configuration.TodSpecialRules[i].DoNotTriggerWith);
             Configuration.TodSpecialRules.RemoveAt(i);
             changed = true;
         }
 
         return changed;
+    }
+
+    private static string MergeRollLists(params string[] rollLists)
+    {
+        var values = rollLists
+            .SelectMany(rollList => rollList.Split([',', ';', ' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Select(text => int.TryParse(text, out var value) ? value : (int?)null)
+            .Where(value => value is >= 0 and <= 9999)
+            .Select(value => value!.Value)
+            .Distinct()
+            .Order()
+            .ToList();
+
+        return string.Join(", ", values);
     }
 
     private static string GetPluginVersion()

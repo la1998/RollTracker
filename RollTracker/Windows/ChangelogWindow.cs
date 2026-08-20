@@ -12,6 +12,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 {
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.30", "Added Always shown and Do not trigger with controls for ToD special rules."),
         new("0.1.0.29", "Fixed duplicate default Special Rules after loading saved configuration."),
         new("0.1.0.28", "Added per-rule Stop pair control for ToD special rules."),
         new("0.1.0.27", "Added an editable Special Rules tab and sends special rule texts as separate chat messages."),

@@ -273,41 +273,66 @@ internal sealed partial class RollTrackerService : IDisposable
         }
 
         var specialRuleTexts = new List<string>();
-        var stopAfterLowest = AppendSpecialRuleTextsForRoll(specialRuleTexts, lowest, "lowest");
+        var pairRolls = ReferenceEquals(highest, lowest)
+            ? [lowest.Value]
+            : new[] { lowest.Value, highest.Value };
+        var lowestRules = BuildSpecialRuleMatchesForRoll(lowest, "lowest", pairRolls);
+        specialRuleTexts.AddRange(lowestRules.Select(rule => rule.Text));
 
         if (ReferenceEquals(highest, lowest))
         {
             return specialRuleTexts;
         }
 
+        var highestRules = BuildSpecialRuleMatchesForRoll(highest, "highest", pairRolls);
+        var stopAfterLowest = lowestRules.Any(rule => rule.StopPairAfterMatch);
         if (stopAfterLowest)
         {
+            specialRuleTexts.AddRange(highestRules
+                .Where(rule => rule.AlwaysShown)
+                .Select(rule => rule.Text));
             return specialRuleTexts;
         }
 
-        AppendSpecialRuleTextsForRoll(specialRuleTexts, highest, "highest");
+        specialRuleTexts.AddRange(highestRules.Select(rule => rule.Text));
         return specialRuleTexts;
     }
 
-    private bool AppendSpecialRuleTextsForRoll(List<string> specialRuleTexts, RollEntry roll, string role)
+    private List<SpecialRuleMatch> BuildSpecialRuleMatchesForRoll(RollEntry roll, string role, IReadOnlyCollection<int> pairRolls)
     {
-        var shouldStopPair = false;
-        foreach (var rule in configuration.TodSpecialRules.Where(rule => rule.Roll == roll.Value))
-        {
-            var text = rule.Text.Trim();
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                continue;
-            }
+        return configuration.TodSpecialRules
+            .Where(rule => rule.Roll == roll.Value)
+            .Where(rule => !ShouldSkipSpecialRule(rule, pairRolls))
+            .Select(rule => BuildSpecialRuleMatch(rule, roll, role))
+            .Where(rule => !string.IsNullOrWhiteSpace(rule.Text))
+            .ToList();
+    }
 
-            specialRuleTexts.Add(text
-                .Replace("{player}", roll.PlayerName, StringComparison.OrdinalIgnoreCase)
-                .Replace("{roll}", roll.Value.ToString(), StringComparison.OrdinalIgnoreCase)
-                .Replace("{role}", role, StringComparison.OrdinalIgnoreCase));
-            shouldStopPair |= rule.StopPairAfterMatch;
-        }
+    private static SpecialRuleMatch BuildSpecialRuleMatch(TodSpecialRule rule, RollEntry roll, string role)
+    {
+        var text = rule.Text.Trim()
+            .Replace("{player}", roll.PlayerName, StringComparison.OrdinalIgnoreCase)
+            .Replace("{roll}", roll.Value.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{role}", role, StringComparison.OrdinalIgnoreCase);
 
-        return shouldStopPair;
+        return new SpecialRuleMatch(text, rule.StopPairAfterMatch, rule.AlwaysShown);
+    }
+
+    private static bool ShouldSkipSpecialRule(TodSpecialRule rule, IReadOnlyCollection<int> pairRolls)
+    {
+        var blockedRolls = ParseSpecialRuleRollList(rule.DoNotTriggerWith);
+
+        return blockedRolls.Count > 0 && pairRolls.Any(blockedRolls.Contains);
+    }
+
+    private static HashSet<int> ParseSpecialRuleRollList(string rollList)
+    {
+        return rollList
+            .Split([',', ';', ' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(text => int.TryParse(text, out var value) ? value : (int?)null)
+            .Where(value => value is >= 0 and <= 9999)
+            .Select(value => value!.Value)
+            .ToHashSet();
     }
 
     private bool TryGetTodSecondPair(
@@ -1143,6 +1168,8 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly record struct MacroStep(string Command, int WaitMilliseconds);
 
     private readonly record struct DelayedCommand(string Command, string PromptType, DateTimeOffset ExecuteAt);
+
+    private readonly record struct SpecialRuleMatch(string Text, bool StopPairAfterMatch, bool AlwaysShown);
 
     private enum RoundKind
     {

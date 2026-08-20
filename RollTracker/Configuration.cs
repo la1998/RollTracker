@@ -124,4 +124,8 @@ public sealed class TodSpecialRule
     public string Text { get; set; } = string.Empty;
 
     public bool StopPairAfterMatch { get; set; }
+
+    public bool AlwaysShown { get; set; }
+
+    public string DoNotTriggerWith { get; set; } = string.Empty;
 }

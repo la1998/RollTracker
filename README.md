@@ -19,7 +19,7 @@ RollTracker publishes stable builds through `dist/RollTracker/latest.zip` and te
 To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's Experimental settings. Testing builds are offered only when `TestingAssemblyVersion` in `repo.json` is higher than the stable `AssemblyVersion`.
 
 Current stable: `0.1.0.26`
-Current testing: `0.1.0.29`
+Current testing: `0.1.0.30`
 
 ## Commands
 
@@ -71,7 +71,7 @@ The window also has `Auto off outside house`. When enabled, RollTracker turns it
 
 The normal result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. The `!tod2` result command also supports `{secondHighest}`, `{secondLowest}`, `{secondHighestRoll}`, and `{secondLowestRoll}`. Each non-empty `!tod2` result command line is sent as its own chat message, so the default result sends the highest/lowest pair and the second pair separately.
 
-The `Special Rules` tab lets you enable or disable special rules, edit the default rules for rolls 0, 1, and 999, and add or delete custom roll-number rules. Special rule text supports `{player}`, `{roll}`, and `{role}`. Matching rule texts are sent as separate chat messages after the normal result line instead of being appended to it. `Stop pair` can be enabled per rule when that rule should prevent checking the other side of the pair; it is on for the default 0 and 1 rules and off for custom rules by default.
+The `Special Rules` tab lets you enable or disable special rules, edit the default rules for rolls 0, 1, and 999, and add or delete custom roll-number rules. Special rule text supports `{player}`, `{roll}`, and `{role}`. Matching rule texts are sent as separate chat messages after the normal result line instead of being appended to it. `Always shown` makes a rule show even when another matching rule stops the pair. `Stop pair` can be enabled per rule when that rule should prevent checking the other side of the pair; it is on for the default 0 and 1 rules and off for custom rules by default. `Do not trigger with` accepts comma- or space-separated roll numbers that suppress that rule when those numbers are also in the pair.
 
 `!wifi` is a separate trigger with its own tab, enabled switch, macro text, and chat target. It can send to Yell, Say, or Party and is also turned off automatically when you leave a housing interior.
 
