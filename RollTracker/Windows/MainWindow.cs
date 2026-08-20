@@ -147,7 +147,7 @@ internal sealed class MainWindow : Window, IDisposable
         }
 
         var secondPairResultCommandTemplate = configuration.TodSecondPairResultCommandTemplate;
-        if (ImGui.InputText("Result command##Tod2", ref secondPairResultCommandTemplate, 1024))
+        if (ImGui.InputTextMultiline("Result command##Tod2", ref secondPairResultCommandTemplate, 1024, new Vector2(0, 55 * ImGuiHelpers.GlobalScale)))
         {
             configuration.TodSecondPairResultCommandTemplate = secondPairResultCommandTemplate;
             saveConfiguration();

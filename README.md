@@ -19,7 +19,7 @@ RollTracker publishes stable builds through `dist/RollTracker/latest.zip` and te
 To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's Experimental settings. Testing builds are offered only when `TestingAssemblyVersion` in `repo.json` is higher than the stable `AssemblyVersion`.
 
 Current stable: `0.1.0.19`
-Current testing: `0.1.0.22`
+Current testing: `0.1.0.23`
 
 ## Commands
 
@@ -69,7 +69,7 @@ When Truth or Dare is enabled, chat triggers `!truth` and `!dare` are also activ
 
 The window also has `Auto off outside house`. When enabled, RollTracker turns itself off automatically when you leave a housing interior.
 
-The normal result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. The `!tod2` result command also supports `{secondHighest}`, `{secondLowest}`, `{secondHighestRoll}`, and `{secondLowestRoll}`. ToD special rules are enabled by default and can be disabled in `Settings`; when enabled, rolls of 0 or 1 add `<name> gets asked Truth and Dare.`, while a highest roll of 999 adds `<name> can ask both Truth and Dare.`. If both happen for the same pair, only the 0/1 message is added.
+The normal result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. The `!tod2` result command also supports `{secondHighest}`, `{secondLowest}`, `{secondHighestRoll}`, and `{secondLowestRoll}`. Each non-empty `!tod2` result command line is sent as its own chat message, so the default result sends the highest/lowest pair and the second pair separately. ToD special rules are enabled by default and can be disabled in `Settings`; when enabled, rolls of 0 or 1 add `<name> gets asked Truth and Dare.`, while a highest roll of 999 adds `<name> can ask both Truth and Dare.`. If both happen for the same pair, only the 0/1 message is added.
 
 `!wifi` is a separate trigger with its own tab, enabled switch, macro text, and chat target. It can send to Yell, Say, or Party and is also turned off automatically when you leave a housing interior.
 

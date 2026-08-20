@@ -11,6 +11,12 @@ namespace RollTracker.Services;
 
 internal sealed partial class RollTrackerService : IDisposable
 {
+    private const string DefaultResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})";
+    private const string LegacySecondPairMacroText = "/y ♦ Time for Truth or Dare 2 ♦  Highest asks lowest, second highest asks second lowest. Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
+    private const string DefaultSecondPairMacroText = "/y ♦ Time for Truth or Dare 2 ♦  Highest asks lowest, second highest asks second lowest,  \"Truth or Dare?\" Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
+    private const string LegacySecondPairResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll}) 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})";
+    private const string DefaultSecondPairResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})\n/y 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})";
+
     private readonly IChatGui chatGui;
     private readonly ICommandManager commandManager;
     private readonly IFramework framework;
@@ -50,6 +56,7 @@ internal sealed partial class RollTrackerService : IDisposable
         this.log = log;
         this.configuration = configuration;
         this.saveConfiguration = saveConfiguration;
+        NormalizeLegacyDefaults();
         housingInteriorTerritoryIds = dataManager.GetExcelSheet<HousingIndoorTerritory>()?.Select(row => row.RowId).ToHashSet() ?? [];
         worldNames = BuildWorldNames(dataManager);
         wasInHousingInterior = IsHousingInterior(clientState.TerritoryType);
@@ -73,6 +80,28 @@ internal sealed partial class RollTrackerService : IDisposable
     public TimeSpan RemainingRoundTime => roundEndsAt is null
         ? TimeSpan.Zero
         : roundEndsAt.Value - DateTimeOffset.Now;
+
+    private void NormalizeLegacyDefaults()
+    {
+        var changed = false;
+
+        if (string.Equals(configuration.TodSecondPairMacroText, LegacySecondPairMacroText, StringComparison.Ordinal))
+        {
+            configuration.TodSecondPairMacroText = DefaultSecondPairMacroText;
+            changed = true;
+        }
+
+        if (string.Equals(configuration.TodSecondPairResultCommandTemplate, LegacySecondPairResultCommandTemplate, StringComparison.Ordinal))
+        {
+            configuration.TodSecondPairResultCommandTemplate = DefaultSecondPairResultCommandTemplate;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            saveConfiguration();
+        }
+    }
 
     public void Dispose()
     {
@@ -107,12 +136,21 @@ internal sealed partial class RollTrackerService : IDisposable
             return;
         }
 
-        var result = currentRoundKind == RoundKind.SecondPair
-            ? BuildSecondPairResultCommand(highest, lowest)
-            : BuildResultCommand(highest, lowest);
-        if (!TryExecuteTextCommand(result))
+        var resultCommands = currentRoundKind == RoundKind.SecondPair
+            ? BuildSecondPairResultCommands(highest, lowest)
+            : [BuildResultCommand(highest, lowest)];
+        var anyCommandFailed = false;
+        foreach (var resultCommand in resultCommands)
         {
-            chatGui.PrintError("Could not send result to yell chat.", "RollTracker");
+            if (!TryExecuteTextCommand(resultCommand))
+            {
+                anyCommandFailed = true;
+            }
+        }
+
+        if (anyCommandFailed)
+        {
+            chatGui.PrintError("Could not send one or more result chat messages.", "RollTracker");
         }
 
         Reset();
@@ -122,7 +160,7 @@ internal sealed partial class RollTrackerService : IDisposable
     private string BuildResultCommand(RollEntry highest, RollEntry lowest)
     {
         var template = string.IsNullOrWhiteSpace(configuration.ResultCommandTemplate)
-            ? "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})"
+            ? DefaultResultCommandTemplate
             : configuration.ResultCommandTemplate;
 
         var result = template
@@ -138,16 +176,20 @@ internal sealed partial class RollTrackerService : IDisposable
             : $"{result} {specialRuleText}";
     }
 
-    private string BuildSecondPairResultCommand(RollEntry highest, RollEntry lowest)
+    private List<string> BuildSecondPairResultCommands(RollEntry highest, RollEntry lowest)
     {
         if (!TryGetTodSecondPair(highest, lowest, out var secondHighest, out var secondLowest))
         {
-            return BuildResultCommand(highest, lowest);
+            return [BuildResultCommand(highest, lowest)];
         }
 
         var template = string.IsNullOrWhiteSpace(configuration.TodSecondPairResultCommandTemplate)
-            ? "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll}) 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})"
+            ? DefaultSecondPairResultCommandTemplate
             : configuration.TodSecondPairResultCommandTemplate;
+        if (template.Equals(LegacySecondPairResultCommandTemplate, StringComparison.Ordinal))
+        {
+            template = DefaultSecondPairResultCommandTemplate;
+        }
 
         var result = template
             .Replace("{highest}", highest.PlayerName, StringComparison.OrdinalIgnoreCase)
@@ -159,15 +201,42 @@ internal sealed partial class RollTrackerService : IDisposable
             .Replace("{secondHighestRoll}", secondHighest.Value.ToString(), StringComparison.OrdinalIgnoreCase)
             .Replace("{secondLowestRoll}", secondLowest.Value.ToString(), StringComparison.OrdinalIgnoreCase);
 
-        var specialText = string.Join(' ', new[]
+        var resultCommands = SplitCommandLines(result);
+        if (resultCommands.Count == 0)
         {
-            BuildTodSpecialRuleText(highest, lowest),
-            BuildTodSpecialRuleText(secondHighest, secondLowest),
-        }.Where(text => !string.IsNullOrWhiteSpace(text)));
+            return [BuildResultCommand(highest, lowest)];
+        }
 
-        return string.IsNullOrWhiteSpace(specialText)
-            ? result
-            : $"{result} {specialText}";
+        AppendSpecialRuleText(resultCommands, 0, BuildTodSpecialRuleText(highest, lowest));
+
+        if (resultCommands.Count > 1)
+        {
+            AppendSpecialRuleText(resultCommands, 1, BuildTodSpecialRuleText(secondHighest, secondLowest));
+        }
+        else
+        {
+            AppendSpecialRuleText(resultCommands, 0, BuildTodSpecialRuleText(secondHighest, secondLowest));
+        }
+
+        return resultCommands;
+    }
+
+    private static List<string> SplitCommandLines(string commandText)
+    {
+        return commandText
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+    }
+
+    private static void AppendSpecialRuleText(List<string> commands, int commandIndex, string specialRuleText)
+    {
+        if (string.IsNullOrWhiteSpace(specialRuleText) || commandIndex < 0 || commandIndex >= commands.Count)
+        {
+            return;
+        }
+
+        commands[commandIndex] = $"{commands[commandIndex]} {specialRuleText}";
     }
 
     private string BuildTodSpecialRuleText(RollEntry highest, RollEntry lowest)
