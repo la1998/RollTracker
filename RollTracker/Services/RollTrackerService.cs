@@ -29,6 +29,7 @@ internal sealed partial class RollTrackerService : IDisposable
     private DateTimeOffset? roundEndsAt;
     private DateTimeOffset nextMacroStepAt;
     private DateTimeOffset nextWifiMacroStepAt;
+    private RoundKind currentRoundKind = RoundKind.Normal;
     private int nextManualRollNumber = 1;
     private bool wasInHousingInterior;
 
@@ -106,13 +107,16 @@ internal sealed partial class RollTrackerService : IDisposable
             return;
         }
 
-        var result = BuildResultCommand(highest, lowest);
+        var result = currentRoundKind == RoundKind.SecondPair
+            ? BuildSecondPairResultCommand(highest, lowest)
+            : BuildResultCommand(highest, lowest);
         if (!TryExecuteTextCommand(result))
         {
             chatGui.PrintError("Could not send result to yell chat.", "RollTracker");
         }
 
         Reset();
+        currentRoundKind = RoundKind.Normal;
     }
 
     private string BuildResultCommand(RollEntry highest, RollEntry lowest)
@@ -128,20 +132,42 @@ internal sealed partial class RollTrackerService : IDisposable
             .Replace("{lowestRoll}", lowest.Value.ToString(), StringComparison.OrdinalIgnoreCase);
 
         var specialRuleText = BuildTodSpecialRuleText(highest, lowest);
-        var secondPairText = string.Empty;
-        var secondPairSpecialRuleText = string.Empty;
 
-        if (TryGetTodSecondPair(highest, lowest, out var secondHighest, out var secondLowest))
+        return string.IsNullOrWhiteSpace(specialRuleText)
+            ? result
+            : $"{result} {specialRuleText}";
+    }
+
+    private string BuildSecondPairResultCommand(RollEntry highest, RollEntry lowest)
+    {
+        if (!TryGetTodSecondPair(highest, lowest, out var secondHighest, out var secondLowest))
         {
-            secondPairText = BuildTodSecondPairText(secondHighest, secondLowest);
-            secondPairSpecialRuleText = BuildTodSpecialRuleText(secondHighest, secondLowest);
+            return BuildResultCommand(highest, lowest);
         }
 
-        var extraText = string.Join(' ', new[] { secondPairText, specialRuleText, secondPairSpecialRuleText }.Where(text => !string.IsNullOrWhiteSpace(text)));
+        var template = string.IsNullOrWhiteSpace(configuration.TodSecondPairResultCommandTemplate)
+            ? "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll}) 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})"
+            : configuration.TodSecondPairResultCommandTemplate;
 
-        return string.IsNullOrWhiteSpace(extraText)
+        var result = template
+            .Replace("{highest}", highest.PlayerName, StringComparison.OrdinalIgnoreCase)
+            .Replace("{lowest}", lowest.PlayerName, StringComparison.OrdinalIgnoreCase)
+            .Replace("{highestRoll}", highest.Value.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{lowestRoll}", lowest.Value.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{secondHighest}", secondHighest.PlayerName, StringComparison.OrdinalIgnoreCase)
+            .Replace("{secondLowest}", secondLowest.PlayerName, StringComparison.OrdinalIgnoreCase)
+            .Replace("{secondHighestRoll}", secondHighest.Value.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{secondLowestRoll}", secondLowest.Value.ToString(), StringComparison.OrdinalIgnoreCase);
+
+        var specialText = string.Join(' ', new[]
+        {
+            BuildTodSpecialRuleText(highest, lowest),
+            BuildTodSpecialRuleText(secondHighest, secondLowest),
+        }.Where(text => !string.IsNullOrWhiteSpace(text)));
+
+        return string.IsNullOrWhiteSpace(specialText)
             ? result
-            : $"{result} {extraText}";
+            : $"{result} {specialText}";
     }
 
     private string BuildTodSpecialRuleText(RollEntry highest, RollEntry lowest)
@@ -215,12 +241,6 @@ internal sealed partial class RollTrackerService : IDisposable
 
     public bool TryAddManualRoll(int value, out string message)
     {
-        if (!configuration.Enabled)
-        {
-            message = "Truth or Dare is disabled.";
-            return false;
-        }
-
         if (!IsRoundRunning)
         {
             message = "Start a Truth or Dare round before adding manual test rolls.";
@@ -242,6 +262,8 @@ internal sealed partial class RollTrackerService : IDisposable
     public void SetEnabled(bool enabled)
     {
         configuration.Enabled = enabled;
+        configuration.TruthTriggerEnabled = enabled;
+        configuration.DareTriggerEnabled = enabled;
         saveConfiguration();
 
         if (!enabled)
@@ -257,12 +279,11 @@ internal sealed partial class RollTrackerService : IDisposable
     public void SetAllModulesEnabled(bool enabled)
     {
         configuration.Enabled = enabled;
+        configuration.TruthTriggerEnabled = enabled;
+        configuration.DareTriggerEnabled = enabled;
+        configuration.HelpTriggerEnabled = enabled;
         configuration.TodSpecialRulesEnabled = enabled;
-        if (!enabled)
-        {
-            configuration.TodSecondPairEnabled = false;
-        }
-
+        configuration.TodSecondPairEnabled = enabled;
         configuration.WifiEnabled = enabled;
         saveConfiguration();
 
@@ -275,6 +296,61 @@ internal sealed partial class RollTrackerService : IDisposable
         }
 
         chatGui.Print($"RollTracker modules {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+    }
+
+    public void SetTruthTriggerEnabled(bool enabled)
+    {
+        configuration.TruthTriggerEnabled = enabled;
+        saveConfiguration();
+
+        if (!enabled)
+        {
+            ClearDelayedTodPrompts("Truth");
+        }
+
+        chatGui.Print($"RollTracker !truth {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+    }
+
+    public void SetDareTriggerEnabled(bool enabled)
+    {
+        configuration.DareTriggerEnabled = enabled;
+        saveConfiguration();
+
+        if (!enabled)
+        {
+            ClearDelayedTodPrompts("Dare");
+        }
+
+        chatGui.Print($"RollTracker !dare {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+    }
+
+    public void SetHelpTriggerEnabled(bool enabled)
+    {
+        configuration.HelpTriggerEnabled = enabled;
+        saveConfiguration();
+
+        if (!enabled)
+        {
+            ClearDelayedTodPrompts("Help");
+        }
+
+        chatGui.Print($"RollTracker !help {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+    }
+
+    public void SetSecondPairEnabled(bool enabled)
+    {
+        configuration.TodSecondPairEnabled = enabled;
+        saveConfiguration();
+
+        if (!enabled && IsSecondPairRoundRunning)
+        {
+            roundEndsAt = null;
+            pendingMacroSteps.Clear();
+            Reset();
+            currentRoundKind = RoundKind.Normal;
+        }
+
+        chatGui.Print($"RollTracker !tod2 second pair rounds {(enabled ? "enabled" : "disabled")}.", "RollTracker");
     }
 
     public void SetWifiEnabled(bool enabled)
@@ -306,12 +382,38 @@ internal sealed partial class RollTrackerService : IDisposable
         Reset();
         pendingMacroSteps.Clear();
         roundEndsAt = null;
+        currentRoundKind = RoundKind.Normal;
 
-        BuildMacroQueue();
+        BuildMacroQueue(configuration.MacroText);
         roundEndsAt = DateTimeOffset.Now.AddSeconds(Math.Clamp(configuration.MacroDurationSeconds, 1, 600));
         nextMacroStepAt = DateTimeOffset.Now;
 
         chatGui.Print($"Round started by {triggeredBy}.", "RollTracker");
+    }
+
+    public void StartSecondPairRoundFromTrigger(string triggeredBy)
+    {
+        if (!configuration.TodSecondPairEnabled)
+        {
+            return;
+        }
+
+        if (IsRoundRunning)
+        {
+            log.Debug("Ignored !tod2 from {PlayerName}; round is already running.", triggeredBy);
+            return;
+        }
+
+        Reset();
+        pendingMacroSteps.Clear();
+        roundEndsAt = null;
+        currentRoundKind = RoundKind.SecondPair;
+
+        BuildMacroQueue(configuration.TodSecondPairMacroText);
+        roundEndsAt = DateTimeOffset.Now.AddSeconds(Math.Clamp(configuration.TodSecondPairMacroDurationSeconds, 1, 600));
+        nextMacroStepAt = DateTimeOffset.Now;
+
+        chatGui.Print($"Second pair round started by {triggeredBy}.", "RollTracker");
     }
 
     public void StartWifiMacro(string triggeredBy)
@@ -342,32 +444,44 @@ internal sealed partial class RollTrackerService : IDisposable
         var sender = chatMessage.Sender.TextValue.Trim();
         var message = chatMessage.Message.TextValue.Trim();
 
+        if (configuration.HelpTriggerEnabled && IsHelpTrigger(message))
+        {
+            SendHelp();
+            return;
+        }
+
         if (IsWifiTrigger(message))
         {
             StartWifiMacro(string.IsNullOrWhiteSpace(sender) ? "Unknown" : sender);
             return;
         }
 
-        if (!configuration.Enabled)
-        {
-            return;
-        }
-
-        if (IsTruthTrigger(message))
+        if (configuration.Enabled && configuration.TruthTriggerEnabled && IsTruthTrigger(message))
         {
             SendRandomTodPrompt("Truth", configuration.TruthPrompts);
             return;
         }
 
-        if (IsDareTrigger(message))
+        if (configuration.Enabled && configuration.DareTriggerEnabled && IsDareTrigger(message))
         {
             SendRandomTodPrompt("Dare", configuration.DarePrompts);
             return;
         }
 
-        if (IsRoundEndMarker(message))
+        if (configuration.Enabled && IsRoundEndMarker(message))
         {
             StartRoundFromTrigger(string.IsNullOrWhiteSpace(sender) ? "Unknown" : sender);
+            return;
+        }
+
+        if (IsSecondPairRoundMarker(message))
+        {
+            StartSecondPairRoundFromTrigger(string.IsNullOrWhiteSpace(sender) ? "Unknown" : sender);
+            return;
+        }
+
+        if (!configuration.Enabled && !IsSecondPairRoundRunning)
+        {
             return;
         }
 
@@ -381,7 +495,7 @@ internal sealed partial class RollTrackerService : IDisposable
 
     private void OnLogMessage(ILogMessage logMessage)
     {
-        if (!configuration.Enabled)
+        if (!configuration.Enabled && !IsSecondPairRoundRunning)
         {
             return;
         }
@@ -458,7 +572,7 @@ internal sealed partial class RollTrackerService : IDisposable
     {
         var now = DateTimeOffset.Now;
 
-        if (configuration.Enabled && roundEndsAt is not null && pendingMacroSteps.Count > 0 && now >= nextMacroStepAt)
+        if (roundEndsAt is not null && pendingMacroSteps.Count > 0 && now >= nextMacroStepAt)
         {
             ExecuteNextMacroStep();
         }
@@ -468,12 +582,12 @@ internal sealed partial class RollTrackerService : IDisposable
             ExecuteNextWifiMacroStep();
         }
 
-        if (configuration.Enabled && pendingTodPromptCommands.Count > 0 && now >= pendingTodPromptCommands.Peek().ExecuteAt)
+        if (pendingTodPromptCommands.Count > 0 && now >= pendingTodPromptCommands.Peek().ExecuteAt)
         {
             ExecuteNextTodPromptCommand();
         }
 
-        if (configuration.Enabled && roundEndsAt is not null && now >= roundEndsAt.Value)
+        if (roundEndsAt is not null && now >= roundEndsAt.Value)
         {
             FinishRoundAndReset();
         }
@@ -484,11 +598,20 @@ internal sealed partial class RollTrackerService : IDisposable
         var isInHousingInterior = IsHousingInterior(territoryType);
 
         if (configuration.AutoDisableWhenLeavingHousing &&
-            (configuration.Enabled || configuration.WifiEnabled) &&
+            (configuration.Enabled ||
+             configuration.TodSecondPairEnabled ||
+             configuration.TruthTriggerEnabled ||
+             configuration.DareTriggerEnabled ||
+             configuration.HelpTriggerEnabled ||
+             configuration.WifiEnabled) &&
             wasInHousingInterior &&
             !isInHousingInterior)
         {
             configuration.Enabled = false;
+            configuration.TruthTriggerEnabled = false;
+            configuration.DareTriggerEnabled = false;
+            configuration.HelpTriggerEnabled = false;
+            configuration.TodSecondPairEnabled = false;
             configuration.WifiEnabled = false;
             roundEndsAt = null;
             pendingMacroSteps.Clear();
@@ -506,11 +629,13 @@ internal sealed partial class RollTrackerService : IDisposable
         return housingInteriorTerritoryIds.Contains(territoryType);
     }
 
-    private void BuildMacroQueue()
+    private bool IsSecondPairRoundRunning => roundEndsAt is not null && currentRoundKind == RoundKind.SecondPair;
+
+    private void BuildMacroQueue(string macroText)
     {
         pendingMacroSteps.Clear();
 
-        var lines = configuration.MacroText
+        var lines = macroText
             .Replace("\r\n", "\n", StringComparison.Ordinal)
             .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
@@ -576,6 +701,24 @@ internal sealed partial class RollTrackerService : IDisposable
         if (!TryExecuteTextCommand(delayedCommand.Command))
         {
             chatGui.PrintError($"Could not send {delayedCommand.PromptType} prompt.", "RollTracker");
+        }
+    }
+
+    private void ClearDelayedTodPrompts(string promptType)
+    {
+        if (pendingTodPromptCommands.Count == 0)
+        {
+            return;
+        }
+
+        var remainingCommands = pendingTodPromptCommands
+            .Where(command => !command.PromptType.Equals(promptType, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        pendingTodPromptCommands.Clear();
+        foreach (var command in remainingCommands)
+        {
+            pendingTodPromptCommands.Enqueue(command);
         }
     }
 
@@ -650,9 +793,70 @@ internal sealed partial class RollTrackerService : IDisposable
             DateTimeOffset.Now.AddMilliseconds(500)));
     }
 
+    private void SendHelp()
+    {
+        var helpLines = BuildHelpLines();
+        var chatCommand = GetChatCommand(configuration.HelpChatChannel);
+
+        for (var i = 0; i < helpLines.Count; i++)
+        {
+            pendingTodPromptCommands.Enqueue(new DelayedCommand(
+                $"{chatCommand} {helpLines[i]}",
+                "Help",
+                DateTimeOffset.Now.AddMilliseconds(500 + (i * 800))));
+        }
+    }
+
+    private List<string> BuildHelpLines()
+    {
+        var helpLines = new List<string>();
+
+        if (configuration.HelpTriggerEnabled)
+        {
+            helpLines.Add("!help - Show currently available RollTracker chat commands.");
+        }
+
+        if (configuration.Enabled)
+        {
+            helpLines.Add("!tod - Start a Truth or Dare roll round.");
+        }
+
+        if (configuration.TodSecondPairEnabled)
+        {
+            helpLines.Add("!tod2 - Start a second-pair Truth or Dare roll round.");
+        }
+
+        if (configuration.Enabled && configuration.TruthTriggerEnabled)
+        {
+            helpLines.Add("!truth - Send a random Truth prompt.");
+        }
+
+        if (configuration.Enabled && configuration.DareTriggerEnabled)
+        {
+            helpLines.Add("!dare - Send a random Dare prompt.");
+        }
+
+        if (configuration.WifiEnabled)
+        {
+            helpLines.Add("!wifi - Show KinkHouse Shells and Discord info.");
+        }
+
+        return helpLines;
+    }
+
     private static bool IsRoundEndMarker(string message)
     {
         return message.Equals("!tod", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsHelpTrigger(string message)
+    {
+        return message.Equals("!help", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSecondPairRoundMarker(string message)
+    {
+        return message.Equals("!tod2", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsTruthTrigger(string message)
@@ -815,4 +1019,10 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly record struct MacroStep(string Command, int WaitMilliseconds);
 
     private readonly record struct DelayedCommand(string Command, string PromptType, DateTimeOffset ExecuteAt);
+
+    private enum RoundKind
+    {
+        Normal,
+        SecondPair,
+    }
 }

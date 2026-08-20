@@ -16,7 +16,7 @@ internal sealed class MainWindow : Window, IDisposable
     private readonly Action saveConfiguration;
 
     public MainWindow(RollTrackerService rollTrackerService, Configuration configuration, Action saveConfiguration)
-        : base("RollTracker##RollTrackerMainWindow", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
+        : base("RollTracker##RollTrackerMainWindow")
     {
         this.rollTrackerService = rollTrackerService;
         this.configuration = configuration;
@@ -99,6 +99,8 @@ internal sealed class MainWindow : Window, IDisposable
 
         ImGui.Separator();
 
+        ImGui.TextUnformatted("!tod");
+
         var duration = configuration.MacroDurationSeconds;
         if (ImGui.InputInt("Macro duration (s)", ref duration))
         {
@@ -114,16 +116,40 @@ internal sealed class MainWindow : Window, IDisposable
         }
 
         var macroText = configuration.MacroText;
-        if (ImGui.InputTextMultiline("Macro", ref macroText, 4096, new Vector2(0, 90 * ImGuiHelpers.GlobalScale)))
+        if (ImGui.InputTextMultiline("Macro##Tod", ref macroText, 4096, new Vector2(0, 90 * ImGuiHelpers.GlobalScale)))
         {
             configuration.MacroText = macroText;
             saveConfiguration();
         }
 
         var resultCommandTemplate = configuration.ResultCommandTemplate;
-        if (ImGui.InputText("Result command", ref resultCommandTemplate, 512))
+        if (ImGui.InputText("Result command##Tod", ref resultCommandTemplate, 512))
         {
             configuration.ResultCommandTemplate = resultCommandTemplate;
+            saveConfiguration();
+        }
+
+        ImGui.Separator();
+        ImGui.TextUnformatted("!tod2");
+
+        var secondPairDuration = configuration.TodSecondPairMacroDurationSeconds;
+        if (ImGui.InputInt("Macro duration (s)##Tod2", ref secondPairDuration))
+        {
+            configuration.TodSecondPairMacroDurationSeconds = Math.Clamp(secondPairDuration, 1, 600);
+            saveConfiguration();
+        }
+
+        var secondPairMacroText = configuration.TodSecondPairMacroText;
+        if (ImGui.InputTextMultiline("Macro##Tod2", ref secondPairMacroText, 4096, new Vector2(0, 90 * ImGuiHelpers.GlobalScale)))
+        {
+            configuration.TodSecondPairMacroText = secondPairMacroText;
+            saveConfiguration();
+        }
+
+        var secondPairResultCommandTemplate = configuration.TodSecondPairResultCommandTemplate;
+        if (ImGui.InputText("Result command##Tod2", ref secondPairResultCommandTemplate, 1024))
+        {
+            configuration.TodSecondPairResultCommandTemplate = secondPairResultCommandTemplate;
             saveConfiguration();
         }
 
@@ -165,7 +191,7 @@ internal sealed class MainWindow : Window, IDisposable
     private void DrawTruthDarePromptTab()
     {
         ImGui.TextUnformatted(configuration.Enabled
-            ? "!truth and !dare are active"
+            ? $"!truth: {(configuration.TruthTriggerEnabled ? "active" : "inactive")} / !dare: {(configuration.DareTriggerEnabled ? "active" : "inactive")}"
             : "!truth and !dare are inactive");
 
         DrawChatChannelCombo("Chat", configuration.TodPromptChatChannel, channel => configuration.TodPromptChatChannel = channel);
@@ -255,7 +281,7 @@ internal sealed class MainWindow : Window, IDisposable
 
     private void DrawChatChannelCombo(string label, string channel, Action<string> setChannel)
     {
-        if (ImGui.BeginCombo("Chat", channel))
+        if (ImGui.BeginCombo(label, channel))
         {
             foreach (var option in new[] { "Yell", "Say", "Party" })
             {
@@ -294,9 +320,28 @@ internal sealed class MainWindow : Window, IDisposable
         var todSecondPairEnabled = configuration.TodSecondPairEnabled;
         if (ImGui.Checkbox("Enable ToD second pair", ref todSecondPairEnabled))
         {
-            configuration.TodSecondPairEnabled = todSecondPairEnabled;
-            saveConfiguration();
+            rollTrackerService.SetSecondPairEnabled(todSecondPairEnabled);
         }
+
+        var truthTriggerEnabled = configuration.TruthTriggerEnabled;
+        if (ImGui.Checkbox("Enable !truth", ref truthTriggerEnabled))
+        {
+            rollTrackerService.SetTruthTriggerEnabled(truthTriggerEnabled);
+        }
+
+        var dareTriggerEnabled = configuration.DareTriggerEnabled;
+        if (ImGui.Checkbox("Enable !dare", ref dareTriggerEnabled))
+        {
+            rollTrackerService.SetDareTriggerEnabled(dareTriggerEnabled);
+        }
+
+        var helpTriggerEnabled = configuration.HelpTriggerEnabled;
+        if (ImGui.Checkbox("Enable !help", ref helpTriggerEnabled))
+        {
+            rollTrackerService.SetHelpTriggerEnabled(helpTriggerEnabled);
+        }
+
+        DrawChatChannelCombo("!help chat", configuration.HelpChatChannel, channel => configuration.HelpChatChannel = channel);
 
         var wifiEnabled = configuration.WifiEnabled;
         if (ImGui.Checkbox("Enable Wifi", ref wifiEnabled))

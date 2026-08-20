@@ -1,6 +1,6 @@
 # RollTracker
 
-It reads chat messages through Dalamud chat events, detects normal `/random` rolls, stores the first roll per player for the current round, and shows the round in a small ImGui window. When `!tod` appears in chat while the plugin is enabled, it starts a configured plugin macro and a timed round. When the configured duration ends, it sends the result to yell chat as `"HighestPlayer"(999)>>>"LowestPlayer"(1)` and clears the list.
+It reads chat messages through Dalamud chat events, detects normal `/random` rolls, stores the first roll per player for the current round, and shows the round in a small ImGui window. When `!tod` appears in chat while the plugin is enabled, it starts a configured plugin macro and a timed round. When `!tod2` appears in chat while second pair rounds are enabled, it starts its own configured macro and timed round. When the configured duration ends, it sends the result to chat and clears the list.
 
 This plugin does not use networking or external APIs. It does send configured slash commands and a final `/y` message when enabled, so keep it private and use it only where everyone involved expects it.
 
@@ -12,6 +12,15 @@ Add this URL in Dalamud under `/xlsettings` > `Experimental` > `Custom Plugin Re
 https://raw.githubusercontent.com/la1998/RollTracker/main/repo.json
 ```
 
+## Testing Builds
+
+RollTracker publishes stable builds through `dist/RollTracker/latest.zip` and testing builds through `dist/RollTracker/testing.zip`.
+
+To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's Experimental settings. Testing builds are offered only when `TestingAssemblyVersion` in `repo.json` is higher than the stable `AssemblyVersion`.
+
+Current stable: `0.1.0.19`
+Current testing: `0.1.0.22`
+
 ## Commands
 
 - `/rt` - opens or closes the window.
@@ -21,8 +30,14 @@ https://raw.githubusercontent.com/la1998/RollTracker/main/repo.json
 - `/rt off tod` - disables only Truth or Dare.
 - `/rt on todrules` - enables the Truth or Dare special result text.
 - `/rt off todrules` - disables the Truth or Dare special result text.
-- `/rt on todsecond` - enables the second-highest to second-lowest Truth or Dare result pair.
-- `/rt off todsecond` - disables the second-highest to second-lowest Truth or Dare result pair.
+- `/rt on todsecond` - enables `!tod2` second pair rounds.
+- `/rt off todsecond` - disables `!tod2` second pair rounds.
+- `/rt on truth` - enables `!truth`.
+- `/rt off truth` - disables `!truth`.
+- `/rt on dare` - enables `!dare`.
+- `/rt off dare` - disables `!dare`.
+- `/rt on help` - enables `!help`.
+- `/rt off help` - disables `!help`.
 - `/rt on wifi` - enables only `!wifi`.
 - `/rt off wifi` - disables only `!wifi`.
 - `/rt status` - prints whether Truth or Dare and `!wifi` are on or off.
@@ -36,15 +51,31 @@ These commands are also listed in the Dalamud plugin installer description and i
 
 When Truth or Dare is enabled, chat triggers `!truth` and `!dare` are also active. They ignore casing and send one random entry from the configured Truth or Dare lists to the selected chat channel.
 
+## Command Relationships
+
+- `/rt on` enables ToD, `!truth`, `!dare`, `!help`, ToD special rules, `!tod2`, and `!wifi`.
+- `/rt off` disables ToD, `!truth`, `!dare`, `!help`, ToD special rules, `!tod2`, and `!wifi`.
+- `/rt on tod` enables ToD and also turns `!truth` and `!dare` back on.
+- `/rt off tod` disables ToD and also turns `!truth` and `!dare` off.
+- `!tod` and `!tod2` use separate macro text, duration, and result command settings.
+- `!tod2` is triggered separately and does not add second-pair output to normal `!tod` rounds.
+- `/rt on truth` and `/rt off truth` only change `!truth`. ToD still has to be enabled for `!truth` to respond in chat.
+- `/rt on dare` and `/rt off dare` only change `!dare`. ToD still has to be enabled for `!dare` to respond in chat.
+- `/rt on help` and `/rt off help` only change `!help`. `!help` lists only the `!` commands that are currently active.
+- `/rt on todrules` and `/rt off todrules` only change the 0/1/999 special result text.
+- `/rt on todsecond` and `/rt off todsecond` only change whether `!tod2` can start second-highest to second-lowest rounds.
+- `/rt on wifi` and `/rt off wifi` only change `!wifi`.
+- `Auto off outside house` disables ToD, `!truth`, `!dare`, `!help`, `!tod2`, and `!wifi` when you leave a housing interior.
+
 The window also has `Auto off outside house`. When enabled, RollTracker turns itself off automatically when you leave a housing interior.
 
-The result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. ToD special rules are enabled by default and can be disabled in `Settings`; when enabled, rolls of 0 or 1 add `<name> gets asked Truth and Dare.`, while a highest roll of 999 adds `<name> can ask both Truth and Dare.`. If both happen for the same pair, only the 0/1 message is added. The second pair option is disabled by default; when enabled and at least four people rolled, the result also adds the second-highest to second-lowest pair and applies the same special roll text to that pair.
+The normal result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. The `!tod2` result command also supports `{secondHighest}`, `{secondLowest}`, `{secondHighestRoll}`, and `{secondLowestRoll}`. ToD special rules are enabled by default and can be disabled in `Settings`; when enabled, rolls of 0 or 1 add `<name> gets asked Truth and Dare.`, while a highest roll of 999 adds `<name> can ask both Truth and Dare.`. If both happen for the same pair, only the 0/1 message is added.
 
 `!wifi` is a separate trigger with its own tab, enabled switch, macro text, and chat target. It can send to Yell, Say, or Party and is also turned off automatically when you leave a housing interior.
 
 The `Truth / Dare` tab lets you choose the chat channel and add, edit, and delete the prompt lists used by `!truth` and `!dare`. Truth and Dare prompts include default starter lists.
 
-The `Settings` tab contains `Enable ToD`, `Enable ToD special rules`, `Enable ToD second pair`, `Enable Wifi`, `Auto off outside house`, and quick buttons to enable or disable all modules.
+The `Settings` tab contains `Enable ToD`, `Enable ToD special rules`, `Enable ToD second pair`, `Enable !truth`, `Enable !dare`, `Enable !help`, `Enable Wifi`, `Auto off outside house`, and quick buttons to enable or disable all modules.
 
 ## Notes
 

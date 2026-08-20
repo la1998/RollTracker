@@ -22,8 +22,14 @@ public sealed class Plugin : IDalamudPlugin
         "/rt off tod - disable Truth or Dare.\n" +
         "/rt on todrules - enable Truth or Dare special rules.\n" +
         "/rt off todrules - disable Truth or Dare special rules.\n" +
-        "/rt on todsecond - enable Truth or Dare second pair.\n" +
-        "/rt off todsecond - disable Truth or Dare second pair.\n" +
+        "/rt on todsecond - enable !tod2 second pair rounds.\n" +
+        "/rt off todsecond - disable !tod2 second pair rounds.\n" +
+        "/rt on truth - enable !truth.\n" +
+        "/rt off truth - disable !truth.\n" +
+        "/rt on dare - enable !dare.\n" +
+        "/rt off dare - disable !dare.\n" +
+        "/rt on help - enable !help.\n" +
+        "/rt off help - disable !help.\n" +
         "/rt on wifi - enable !wifi.\n" +
         "/rt off wifi - disable !wifi.\n" +
         "/rt status - show module states.\n" +
@@ -131,7 +137,7 @@ public sealed class Plugin : IDalamudPlugin
 
         if (trimmedArgs.Equals("status", StringComparison.OrdinalIgnoreCase))
         {
-            ChatGui.Print($"RollTracker ToD is {(Configuration.Enabled ? "on" : "off")}; ToD special rules are {(Configuration.TodSpecialRulesEnabled ? "on" : "off")}; ToD second pair is {(Configuration.TodSecondPairEnabled ? "on" : "off")}; !wifi is {(Configuration.WifiEnabled ? "on" : "off")}.", "RollTracker");
+            ChatGui.Print($"RollTracker ToD is {(Configuration.Enabled ? "on" : "off")}; !truth is {(Configuration.TruthTriggerEnabled ? "on" : "off")}; !dare is {(Configuration.DareTriggerEnabled ? "on" : "off")}; !help is {(Configuration.HelpTriggerEnabled ? "on" : "off")}; ToD special rules are {(Configuration.TodSpecialRulesEnabled ? "on" : "off")}; !tod2 is {(Configuration.TodSecondPairEnabled ? "on" : "off")}; !wifi is {(Configuration.WifiEnabled ? "on" : "off")}.", "RollTracker");
             return;
         }
 
@@ -191,9 +197,28 @@ public sealed class Plugin : IDalamudPlugin
             target.Equals("tod second", StringComparison.OrdinalIgnoreCase) ||
             target.Equals("second", StringComparison.OrdinalIgnoreCase))
         {
-            Configuration.TodSecondPairEnabled = enabled;
-            SaveConfiguration();
-            ChatGui.Print($"RollTracker ToD second pair {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+            RollTrackerService.SetSecondPairEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("truth", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!truth", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetTruthTriggerEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("dare", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!dare", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetDareTriggerEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("help", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!help", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetHelpTriggerEnabled(enabled);
             return true;
         }
 

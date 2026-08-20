@@ -13,11 +13,19 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool TodSecondPairEnabled { get; set; }
 
+    public bool TruthTriggerEnabled { get; set; } = true;
+
+    public bool DareTriggerEnabled { get; set; } = true;
+
+    public bool HelpTriggerEnabled { get; set; } = true;
+
     public bool WifiEnabled { get; set; } = true;
 
     public bool AutoDisableWhenLeavingHousing { get; set; } = true;
 
     public int MacroDurationSeconds { get; set; } = 60;
+
+    public int TodSecondPairMacroDurationSeconds { get; set; } = 60;
 
     public int MacroLineDelayMilliseconds { get; set; } = 1000;
 
@@ -25,7 +33,13 @@ public sealed class Configuration : IPluginConfiguration
 
     public string ResultCommandTemplate { get; set; } = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})";
 
+    public string TodSecondPairMacroText { get; set; } = "/y ♦ Time for Truth or Dare 2 ♦  Highest asks lowest, second highest asks second lowest. Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
+
+    public string TodSecondPairResultCommandTemplate { get; set; } = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll}) 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})";
+
     public string TodPromptChatChannel { get; set; } = "Yell";
+
+    public string HelpChatChannel { get; set; } = "Yell";
 
     public List<string> TruthPrompts { get; set; } =
     [
