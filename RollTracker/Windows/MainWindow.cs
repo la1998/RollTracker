@@ -195,7 +195,6 @@ internal sealed class MainWindow : Window, IDisposable
     private string newDarePrompt = string.Empty;
     private int newSpecialRuleRoll;
     private string newSpecialRuleText = string.Empty;
-    private string newSpecialRuleDoNotTriggerWith = string.Empty;
 
     private void DrawTruthDarePromptTab()
     {
@@ -349,19 +348,14 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.SetNextItemWidth(-1);
         ImGui.InputText("New text", ref newSpecialRuleText, 1024);
 
-        ImGui.SetNextItemWidth(-1);
-        ImGui.InputText("New rule do not trigger with", ref newSpecialRuleDoNotTriggerWith, 256);
-
         if (ImGui.Button("Add rule") && !string.IsNullOrWhiteSpace(newSpecialRuleText))
         {
             configuration.TodSpecialRules.Add(new TodSpecialRule
             {
                 Roll = newSpecialRuleRoll,
                 Text = newSpecialRuleText.Trim(),
-                DoNotTriggerWith = newSpecialRuleDoNotTriggerWith.Trim(),
             });
             newSpecialRuleText = string.Empty;
-            newSpecialRuleDoNotTriggerWith = string.Empty;
             saveConfiguration();
         }
     }

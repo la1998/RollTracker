@@ -166,7 +166,7 @@ internal sealed partial class RollTrackerService : IDisposable
             resultCommands.Add(BuildResultCommandFromTemplate(DefaultResultCommandTemplate, highest, lowest));
         }
 
-        AppendSpecialRuleCommands(resultCommands, 0, BuildTodSpecialRuleTexts(highest, lowest));
+        AppendSpecialRuleCommands(resultCommands, 0, BuildTodSpecialRuleTexts());
         return resultCommands;
     }
 
@@ -210,16 +210,7 @@ internal sealed partial class RollTrackerService : IDisposable
             return BuildResultCommands(highest, lowest);
         }
 
-        AppendSpecialRuleCommands(resultCommands, 0, BuildTodSpecialRuleTexts(highest, lowest));
-
-        if (resultCommands.Count > 1)
-        {
-            AppendSpecialRuleCommands(resultCommands, 1, BuildTodSpecialRuleTexts(secondHighest, secondLowest));
-        }
-        else
-        {
-            AppendSpecialRuleCommands(resultCommands, 0, BuildTodSpecialRuleTexts(secondHighest, secondLowest));
-        }
+        AppendSpecialRuleCommands(resultCommands, resultCommands.Count - 1, BuildTodSpecialRuleTexts());
 
         return resultCommands;
     }
@@ -265,36 +256,43 @@ internal sealed partial class RollTrackerService : IDisposable
             : trimmedCommand[..firstSpaceIndex];
     }
 
-    private List<string> BuildTodSpecialRuleTexts(RollEntry highest, RollEntry lowest)
+    private List<string> BuildTodSpecialRuleTexts()
     {
         if (!configuration.TodSpecialRulesEnabled)
         {
             return [];
         }
 
-        var specialRuleTexts = new List<string>();
-        var pairRolls = ReferenceEquals(highest, lowest)
-            ? [lowest.Value]
-            : new[] { lowest.Value, highest.Value };
-        specialRuleTexts.AddRange(BuildSpecialRuleTextsForRoll(lowest, "lowest", pairRolls));
-
-        if (ReferenceEquals(highest, lowest))
-        {
-            return specialRuleTexts;
-        }
-
-        specialRuleTexts.AddRange(BuildSpecialRuleTextsForRoll(highest, "highest", pairRolls));
-        return specialRuleTexts;
+        var roundRolls = rolls.Select(roll => roll.Value).ToHashSet();
+        return rolls
+            .OrderBy(roll => roll.Time)
+            .SelectMany(roll => BuildSpecialRuleTextsForRoll(roll, GetRollRole(roll), roundRolls))
+            .ToList();
     }
 
-    private List<string> BuildSpecialRuleTextsForRoll(RollEntry roll, string role, IReadOnlyCollection<int> pairRolls)
+    private List<string> BuildSpecialRuleTextsForRoll(RollEntry roll, string role, IReadOnlyCollection<int> roundRolls)
     {
         return configuration.TodSpecialRules
             .Where(rule => rule.Roll == roll.Value)
-            .Where(rule => !ShouldSkipSpecialRule(rule, pairRolls))
+            .Where(rule => !ShouldSkipSpecialRule(rule, roundRolls))
             .Select(rule => BuildSpecialRuleText(rule, roll, role))
             .Where(text => !string.IsNullOrWhiteSpace(text))
             .ToList();
+    }
+
+    private string GetRollRole(RollEntry roll)
+    {
+        if (HighestRoll is { } highest && ReferenceEquals(roll, highest))
+        {
+            return "highest";
+        }
+
+        if (LowestRoll is { } lowest && ReferenceEquals(roll, lowest))
+        {
+            return "lowest";
+        }
+
+        return "roll";
     }
 
     private static string BuildSpecialRuleText(TodSpecialRule rule, RollEntry roll, string role)
