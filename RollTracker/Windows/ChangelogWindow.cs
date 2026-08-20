@@ -12,6 +12,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 {
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.34", "Polished the Settings tab with clearer sections."),
         new("0.1.0.33", "Bug fix: Special Rules now check every roll in the round and the add form has one text field."),
         new("0.1.0.32", "Bug fix: Special Rules now use Do not trigger with so custom rules are not hidden by 0/1 weighting."),
         new("0.1.0.31", "Added repository cache-busting metadata for testing updates."),

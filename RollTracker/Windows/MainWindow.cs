@@ -404,6 +404,8 @@ internal sealed class MainWindow : Window, IDisposable
 
     private void DrawSettingsTab()
     {
+        DrawSettingsSection("Truth or Dare");
+
         var todEnabled = configuration.Enabled;
         if (ImGui.Checkbox("Enable ToD", ref todEnabled))
         {
@@ -415,6 +417,8 @@ internal sealed class MainWindow : Window, IDisposable
         {
             rollTrackerService.SetSecondPairEnabled(todSecondPairEnabled);
         }
+
+        DrawSettingsSection("Truth / Dare Suggestions");
 
         var truthTriggerEnabled = configuration.TruthTriggerEnabled;
         if (ImGui.Checkbox("Enable !truth", ref truthTriggerEnabled))
@@ -428,6 +432,8 @@ internal sealed class MainWindow : Window, IDisposable
             rollTrackerService.SetDareTriggerEnabled(dareTriggerEnabled);
         }
 
+        DrawSettingsSection("Help & Auto Off");
+
         var helpTriggerEnabled = configuration.HelpTriggerEnabled;
         if (ImGui.Checkbox("Enable !help", ref helpTriggerEnabled))
         {
@@ -436,12 +442,6 @@ internal sealed class MainWindow : Window, IDisposable
 
         DrawChatChannelCombo("!help chat", configuration.HelpChatChannel, channel => configuration.HelpChatChannel = channel);
 
-        var wifiEnabled = configuration.WifiEnabled;
-        if (ImGui.Checkbox("Enable Wifi", ref wifiEnabled))
-        {
-            rollTrackerService.SetWifiEnabled(wifiEnabled);
-        }
-
         var autoDisableWhenLeavingHousing = configuration.AutoDisableWhenLeavingHousing;
         if (ImGui.Checkbox("Auto off outside house", ref autoDisableWhenLeavingHousing))
         {
@@ -449,7 +449,15 @@ internal sealed class MainWindow : Window, IDisposable
             saveConfiguration();
         }
 
-        ImGui.Separator();
+        DrawSettingsSection("Wifi");
+
+        var wifiEnabled = configuration.WifiEnabled;
+        if (ImGui.Checkbox("Enable Wifi", ref wifiEnabled))
+        {
+            rollTrackerService.SetWifiEnabled(wifiEnabled);
+        }
+
+        DrawSettingsSection("Global");
 
         if (ImGui.Button("Enable all"))
         {
@@ -462,6 +470,15 @@ internal sealed class MainWindow : Window, IDisposable
         {
             rollTrackerService.SetAllModulesEnabled(false);
         }
+    }
+
+    private static void DrawSettingsSection(string title)
+    {
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+        ImGui.TextUnformatted(title);
+        ImGui.Spacing();
     }
 
     private static void DrawSummaryLine(string label, RollEntry? roll)
