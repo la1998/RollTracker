@@ -432,7 +432,7 @@ internal sealed class MainWindow : Window, IDisposable
             rollTrackerService.SetDareTriggerEnabled(dareTriggerEnabled);
         }
 
-        DrawSettingsSection("Help & Auto Off");
+        DrawSettingsSection("General");
 
         var helpTriggerEnabled = configuration.HelpTriggerEnabled;
         if (ImGui.Checkbox("Enable !help", ref helpTriggerEnabled))
