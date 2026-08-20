@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
@@ -68,6 +69,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private MainWindow MainWindow { get; }
 
+    private ChangelogWindow ChangelogWindow { get; }
+
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
@@ -82,8 +85,10 @@ public sealed class Plugin : IDalamudPlugin
             Configuration,
             SaveConfiguration);
         MainWindow = new MainWindow(RollTrackerService, Configuration, SaveConfiguration);
+        ChangelogWindow = new ChangelogWindow(Configuration, SaveConfiguration, GetPluginVersion());
 
         WindowSystem.AddWindow(MainWindow);
+        WindowSystem.AddWindow(ChangelogWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -110,6 +115,7 @@ public sealed class Plugin : IDalamudPlugin
 
         WindowSystem.RemoveAllWindows();
         MainWindow.Dispose();
+        ChangelogWindow.Dispose();
         RollTrackerService.Dispose();
     }
 
@@ -305,5 +311,19 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.ResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})";
             SaveConfiguration();
         }
+    }
+
+    private static string GetPluginVersion()
+    {
+        var informationalVersion = typeof(Plugin).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+
+        if (!string.IsNullOrWhiteSpace(informationalVersion))
+        {
+            return informationalVersion.Split('+', 2)[0];
+        }
+
+        return typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "unknown";
     }
 }

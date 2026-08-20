@@ -23,6 +23,8 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool AutoDisableWhenLeavingHousing { get; set; } = true;
 
+    public string LastSeenChangelogVersion { get; set; } = string.Empty;
+
     public int MacroDurationSeconds { get; set; } = 60;
 
     public int TodSecondPairMacroDurationSeconds { get; set; } = 60;

@@ -19,7 +19,7 @@ RollTracker publishes stable builds through `dist/RollTracker/latest.zip` and te
 To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's Experimental settings. Testing builds are offered only when `TestingAssemblyVersion` in `repo.json` is higher than the stable `AssemblyVersion`.
 
 Current stable: `0.1.0.19`
-Current testing: `0.1.0.25`
+Current testing: `0.1.0.26`
 
 ## Commands
 
@@ -76,6 +76,8 @@ The normal result command can be edited in the window. Supported placeholders ar
 The `Truth / Dare` tab lets you choose the chat channel and add, edit, and delete the prompt lists used by `!truth` and `!dare`. Truth and Dare prompts include default starter lists.
 
 The `Settings` tab contains `Enable ToD`, `Enable ToD special rules`, `Enable ToD second pair`, `Enable !truth`, `Enable !dare`, `Enable !help`, `Enable Wifi`, `Auto off outside house`, and quick buttons to enable or disable all modules.
+
+After an update, RollTracker can show a small dismissible changelog window. It remembers the last version you acknowledged and only opens again when the installed plugin version changes.
 
 ## Notes
 
