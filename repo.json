@@ -2,7 +2,7 @@
   "Author": "Arty",
   "Name": "RollTracker",
   "InternalName": "RollTracker",
-  "AssemblyVersion": "0.1.0.34",
+  "AssemblyVersion": "0.1.0.35",
   "TestingAssemblyVersion": "0.1.0.35",
   "TestingDalamudApiLevel": 15,
   "TestingChangelog": "Bug fix: !truth and !dare now work from their own toggles even when ToD is off.",
@@ -25,5 +25,5 @@
   "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.35",
   "DownloadLinkUpdate": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
   "RepoUrl": "https://github.com/la1998/RollTracker",
-  "LastUpdate": "1787314058"
+  "LastUpdate": "1787314478"
 }
