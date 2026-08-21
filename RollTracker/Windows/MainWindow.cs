@@ -198,9 +198,7 @@ internal sealed class MainWindow : Window, IDisposable
 
     private void DrawTruthDarePromptTab()
     {
-        ImGui.TextUnformatted(configuration.Enabled
-            ? $"!truth: {(configuration.TruthTriggerEnabled ? "active" : "inactive")} / !dare: {(configuration.DareTriggerEnabled ? "active" : "inactive")}"
-            : "!truth and !dare are inactive");
+        ImGui.TextUnformatted($"!truth: {(configuration.TruthTriggerEnabled ? "active" : "inactive")} / !dare: {(configuration.DareTriggerEnabled ? "active" : "inactive")}");
 
         DrawChatChannelCombo("Chat", configuration.TodPromptChatChannel, channel => configuration.TodPromptChatChannel = channel);
 

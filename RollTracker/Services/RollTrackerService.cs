@@ -590,13 +590,13 @@ internal sealed partial class RollTrackerService : IDisposable
             return;
         }
 
-        if (configuration.Enabled && configuration.TruthTriggerEnabled && IsTruthTrigger(message))
+        if (configuration.TruthTriggerEnabled && IsTruthTrigger(message))
         {
             SendRandomTodPrompt("Truth", configuration.TruthPrompts);
             return;
         }
 
-        if (configuration.Enabled && configuration.DareTriggerEnabled && IsDareTrigger(message))
+        if (configuration.DareTriggerEnabled && IsDareTrigger(message))
         {
             SendRandomTodPrompt("Dare", configuration.DarePrompts);
             return;
@@ -960,12 +960,12 @@ internal sealed partial class RollTrackerService : IDisposable
             helpLines.Add("!tod2 - Start a second-pair Truth or Dare roll round.");
         }
 
-        if (configuration.Enabled && configuration.TruthTriggerEnabled)
+        if (configuration.TruthTriggerEnabled)
         {
             helpLines.Add("!truth - Send a random Truth prompt.");
         }
 
-        if (configuration.Enabled && configuration.DareTriggerEnabled)
+        if (configuration.DareTriggerEnabled)
         {
             helpLines.Add("!dare - Send a random Dare prompt.");
         }

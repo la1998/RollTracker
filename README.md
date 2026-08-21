@@ -19,7 +19,7 @@ RollTracker publishes stable builds through `dist/RollTracker/latest.zip` and te
 To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's Experimental settings. Testing builds are offered only when `TestingAssemblyVersion` in `repo.json` is higher than the stable `AssemblyVersion`.
 
 Current stable: `0.1.0.34`
-Current testing: `0.1.0.34`
+Current testing: `0.1.0.35`
 
 ## Commands
 
@@ -49,7 +49,7 @@ Current testing: `0.1.0.34`
 
 These commands are also listed in the Dalamud plugin installer description and in Dalamud command help.
 
-When Truth or Dare is enabled, chat triggers `!truth` and `!dare` are also active. They ignore casing and send one random entry from the configured Truth or Dare lists to the selected chat channel.
+When their toggles are enabled, chat triggers `!truth` and `!dare` are active. They ignore casing and send one random entry from the configured Truth or Dare lists to the selected chat channel.
 
 ## Command Relationships
 
@@ -59,8 +59,8 @@ When Truth or Dare is enabled, chat triggers `!truth` and `!dare` are also activ
 - `/rt off tod` only disables ToD itself. `!truth` and `!dare` keep their own enabled or disabled state.
 - `!tod` and `!tod2` use separate macro text, duration, and result command settings.
 - `!tod2` is triggered separately and does not add second-pair output to normal `!tod` rounds.
-- `/rt on truth` and `/rt off truth` only change `!truth`. ToD still has to be enabled for `!truth` to respond in chat.
-- `/rt on dare` and `/rt off dare` only change `!dare`. ToD still has to be enabled for `!dare` to respond in chat.
+- `/rt on truth` and `/rt off truth` only change `!truth`.
+- `/rt on dare` and `/rt off dare` only change `!dare`.
 - `/rt on help` and `/rt off help` only change `!help`. `!help` lists only the `!` commands that are currently active.
 - `/rt on todrules` and `/rt off todrules` only change whether the configured Special Rules are applied.
 - `/rt on todsecond` and `/rt off todsecond` only change whether `!tod2` can start second-highest to second-lowest rounds.
