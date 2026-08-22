@@ -12,6 +12,8 @@ internal sealed class ChangelogWindow : Window, IDisposable
 {
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.37", "Bug fix: default prompt and special rule lists no longer duplicate on future loads."),
+        new("0.1.0.36", "Bug fix: duplicate Truth, Dare, and Special Rule entries are cleaned up on load."),
         new("0.1.0.35", "Bug fix: !truth and !dare now work from their own toggles even when ToD is off."),
         new("0.1.0.34", "Polished the Settings tab with clearer sections."),
         new("0.1.0.33", "Bug fix: Special Rules now check every roll in the round and the add form has one text field."),

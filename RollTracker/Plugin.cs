@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Dalamud.Game.Command;
@@ -306,27 +307,44 @@ public sealed class Plugin : IDalamudPlugin
 
     private void MigrateConfiguration()
     {
+        var changed = false;
+
         if (Configuration.ResultCommandTemplate.Equals("/y \"{highest}\">\"{lowest}\"", StringComparison.OrdinalIgnoreCase) ||
             Configuration.ResultCommandTemplate.Equals("/y \"{highest}\">>>\"{lowest}\"", StringComparison.OrdinalIgnoreCase))
         {
             Configuration.ResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})";
-            SaveConfiguration();
+            changed = true;
+        }
+
+        Configuration.TruthPrompts ??= [];
+        Configuration.DarePrompts ??= [];
+        changed |= RemoveDuplicatePrompts(Configuration.TruthPrompts);
+        changed |= RemoveDuplicatePrompts(Configuration.DarePrompts);
+
+        if (Configuration.TruthPrompts.Count == 0)
+        {
+            Configuration.TruthPrompts.AddRange(Configuration.CreateDefaultTruthPrompts());
+            changed = true;
+        }
+
+        if (Configuration.DarePrompts.Count == 0)
+        {
+            Configuration.DarePrompts.AddRange(Configuration.CreateDefaultDarePrompts());
+            changed = true;
         }
 
         if (Configuration.TodSpecialRules is null)
         {
             Configuration.TodSpecialRules = [];
-            SaveConfiguration();
+            changed = true;
         }
 
-        var changedSpecialRules = RemoveDuplicateSpecialRules();
+        changed |= RemoveDuplicateSpecialRules();
 
         if (Configuration.TodSpecialRules.Count == 0)
         {
-            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare." });
-            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare." });
-            Configuration.TodSpecialRules.Add(new TodSpecialRule { Roll = 999, Text = "{player} can ask both Truth and Dare.", DoNotTriggerWith = "0, 1" });
-            changedSpecialRules = true;
+            Configuration.TodSpecialRules.AddRange(Configuration.CreateDefaultTodSpecialRules());
+            changed = true;
         }
 
         foreach (var rule in Configuration.TodSpecialRules)
@@ -336,14 +354,43 @@ public sealed class Plugin : IDalamudPlugin
                 rule.Text.Equals("{player} can ask both Truth and Dare.", StringComparison.Ordinal))
             {
                 rule.DoNotTriggerWith = "0, 1";
-                changedSpecialRules = true;
+                changed = true;
             }
         }
 
-        if (changedSpecialRules)
+        if (changed)
         {
             SaveConfiguration();
         }
+    }
+
+    private static bool RemoveDuplicatePrompts(List<string> prompts)
+    {
+        var seenPrompts = new HashSet<string>(StringComparer.Ordinal);
+        var deduplicatedPrompts = new List<string>();
+
+        foreach (var originalPrompt in prompts)
+        {
+            var prompt = originalPrompt.Trim();
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                continue;
+            }
+
+            if (seenPrompts.Add(prompt))
+            {
+                deduplicatedPrompts.Add(prompt);
+            }
+        }
+
+        if (deduplicatedPrompts.SequenceEqual(prompts, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        prompts.Clear();
+        prompts.AddRange(deduplicatedPrompts);
+        return true;
     }
 
     private bool RemoveDuplicateSpecialRules()
@@ -351,17 +398,27 @@ public sealed class Plugin : IDalamudPlugin
         var changed = false;
         for (var i = Configuration.TodSpecialRules.Count - 1; i >= 0; i--)
         {
+            var currentRule = Configuration.TodSpecialRules[i];
+            currentRule.Text = currentRule.Text.Trim();
+            currentRule.DoNotTriggerWith = MergeRollLists(currentRule.DoNotTriggerWith);
+            if (!currentRule.Text.Equals(Configuration.TodSpecialRules[i].Text, StringComparison.Ordinal) ||
+                !currentRule.DoNotTriggerWith.Equals(Configuration.TodSpecialRules[i].DoNotTriggerWith, StringComparison.Ordinal))
+            {
+                changed = true;
+            }
+
             var duplicateIndex = Configuration.TodSpecialRules.FindIndex(0, i, rule =>
-                rule.Roll == Configuration.TodSpecialRules[i].Roll &&
-                rule.Text.Equals(Configuration.TodSpecialRules[i].Text, StringComparison.Ordinal));
+                rule.Roll == currentRule.Roll &&
+                rule.Text.Trim().Equals(currentRule.Text, StringComparison.Ordinal));
             if (duplicateIndex < 0)
             {
+                Configuration.TodSpecialRules[i] = currentRule;
                 continue;
             }
 
             Configuration.TodSpecialRules[duplicateIndex].DoNotTriggerWith = MergeRollLists(
                 Configuration.TodSpecialRules[duplicateIndex].DoNotTriggerWith,
-                Configuration.TodSpecialRules[i].DoNotTriggerWith);
+                currentRule.DoNotTriggerWith);
             Configuration.TodSpecialRules.RemoveAt(i);
             changed = true;
         }
