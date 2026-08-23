@@ -4,10 +4,10 @@
   "Name": "RollTracker",
   "InternalName": "RollTracker",
   "AssemblyVersion": "0.1.0.38",
-  "TestingAssemblyVersion": "0.1.0.38",
+  "TestingAssemblyVersion": "0.1.0.39",
   "TestingDalamudApiLevel": 15,
-  "TestingChangelog": "Bug fix: default prompt and special rule lists no longer duplicate on future loads.",
-  "Description": "Reads chat messages, detects /random rolls, tracks Truth or Dare rounds, and provides configurable !truth, !dare, !help, !tod2, and !wifi helpers.\n\nCommands:\n/rt - open or close the window.\n/rt on - enable all modules.\n/rt off - disable all modules.\n/rt on tod - enable Truth or Dare.\n/rt off tod - disable Truth or Dare.\n/rt on todrules - enable Truth or Dare special rules.\n/rt off todrules - disable Truth or Dare special rules.\n/rt on todsecond - enable !tod2 second pair rounds.\n/rt off todsecond - disable !tod2 second pair rounds.\n/rt on truth - enable !truth.\n/rt off truth - disable !truth.\n/rt on dare - enable !dare.\n/rt off dare - disable !dare.\n/rt on help - enable !help.\n/rt off help - disable !help.\n/rt on wifi - enable !wifi.\n/rt off wifi - disable !wifi.\n/rt status - show module states.\n/rt reset - clear the current roll list.\n/rt end - send the current result, then clear the list.\n/rt add <number> - add a manual test roll to the running round.\n/rt test - add sample rolls for checking the UI.\n/rolltracker - same commands as /rt.\n\nChat triggers:\n!help - show currently available RollTracker chat commands.\n!tod - start a normal ToD round while ToD is enabled.\n!tod2 - start a second pair ToD round while !tod2 is enabled.\n!truth - send a random Truth prompt while !truth is enabled.\n!dare - send a random Dare prompt while !dare is enabled.",
+  "TestingChangelog": "Testing update: safer help output timing, separate macro line delays, local /rt help, config folder shortcut, too-few-player result texts, and Truth/Dare prompt sets.",
+  "Description": "Reads chat messages, detects /random rolls, tracks Truth or Dare rounds, and provides configurable !truth, !dare, !help, !tod2, and !wifi helpers.\n\nCommands:\n/rt - open or close the window.\n/rt help - show the full command and trigger list locally.",
   "ApplicableVersion": "any",
   "Tags": [
     "random",
@@ -23,9 +23,9 @@
   "Punchline": "Tracks /random rolls for private round games.",
   "AcceptsFeedback": false,
   "DownloadLinkInstall": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
-  "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.38",
+  "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.39",
   "DownloadLinkUpdate": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
   "RepoUrl": "https://github.com/la1998/RollTracker",
-  "LastUpdate": "1787366057"
+  "LastUpdate": "1787478138"
 }
 ]

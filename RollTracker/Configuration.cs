@@ -31,13 +31,19 @@ public sealed class Configuration : IPluginConfiguration
 
     public int MacroLineDelayMilliseconds { get; set; } = 1000;
 
+    public int TodSecondPairMacroLineDelayMilliseconds { get; set; } = 1000;
+
     public string MacroText { get; set; } = "/y ♦ Time for Truth or Dare ♦  Highest number asks the lowest number, \"Truth or Dare?\"  Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
 
     public string ResultCommandTemplate { get; set; } = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})";
 
+    public string NotEnoughPlayersResultText { get; set; } = "Not enough players for a round.";
+
     public string TodSecondPairMacroText { get; set; } = "/y ♦ Time for Truth or Dare 2 ♦  Highest asks lowest, second highest asks second lowest,  \"Truth or Dare?\" Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
 
     public string TodSecondPairResultCommandTemplate { get; set; } = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})\n/y 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})";
+
+    public string TodSecondPairNotEnoughPlayersResultText { get; set; } = "2nd: Not enough players for second pair.";
 
     public string TodPromptChatChannel { get; set; } = "Yell";
 
@@ -49,7 +55,13 @@ public sealed class Configuration : IPluginConfiguration
 
     public List<string> DarePrompts { get; set; } = [];
 
+    public List<TodPromptSet> TruthPromptSets { get; set; } = [];
+
+    public List<TodPromptSet> DarePromptSets { get; set; } = [];
+
     public string WifiChatChannel { get; set; } = "Yell";
+
+    public int WifiMacroLineDelayMilliseconds { get; set; } = 1000;
 
     public string WifiMacroText { get; set; } = "KinkHouse Shells and Discord:\nLightless - our main sync:\nID: LLS-SWN693A68P5R  PW: KinkHausOCE\n\nPlayerSync - our optional/backup sync:\nID: MSS-6AC6326WFU4P  PW: KinkHausOCE\n\nDiscord:\nhttps://discord.gg/7N7xaghGTr";
 
@@ -130,6 +142,15 @@ public sealed class Configuration : IPluginConfiguration
             "Change your colour scheme to this for 30m",
         ];
     }
+}
+
+public sealed class TodPromptSet
+{
+    public string Name { get; set; } = "Set 1";
+
+    public bool Enabled { get; set; } = true;
+
+    public List<string> Prompts { get; set; } = [];
 }
 
 public sealed class TodSpecialRule

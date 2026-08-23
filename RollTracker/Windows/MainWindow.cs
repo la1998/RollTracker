@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
+using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
 using RollTracker.Services;
 
 namespace RollTracker.Windows;
@@ -13,13 +17,22 @@ internal sealed class MainWindow : Window, IDisposable
 {
     private readonly RollTrackerService rollTrackerService;
     private readonly Configuration configuration;
+    private readonly IDalamudPluginInterface pluginInterface;
+    private readonly IChatGui chatGui;
     private readonly Action saveConfiguration;
 
-    public MainWindow(RollTrackerService rollTrackerService, Configuration configuration, Action saveConfiguration)
+    public MainWindow(
+        RollTrackerService rollTrackerService,
+        Configuration configuration,
+        IDalamudPluginInterface pluginInterface,
+        IChatGui chatGui,
+        Action saveConfiguration)
         : base("RollTracker##RollTrackerMainWindow")
     {
         this.rollTrackerService = rollTrackerService;
         this.configuration = configuration;
+        this.pluginInterface = pluginInterface;
+        this.chatGui = chatGui;
         this.saveConfiguration = saveConfiguration;
 
         SizeConstraints = new WindowSizeConstraints
@@ -120,6 +133,7 @@ internal sealed class MainWindow : Window, IDisposable
             configuration.MacroLineDelayMilliseconds = Math.Clamp(lineDelay, 100, 10000);
             saveConfiguration();
         }
+        DrawHelpTooltip("Delay between !tod macro lines. Leave this alone unless chat lines are skipped.");
 
         var macroText = configuration.MacroText;
         if (ImGui.InputTextMultiline("Macro##Tod", ref macroText, 4096, new Vector2(0, 90 * ImGuiHelpers.GlobalScale)))
@@ -135,6 +149,13 @@ internal sealed class MainWindow : Window, IDisposable
             saveConfiguration();
         }
 
+        var notEnoughPlayersResultText = configuration.NotEnoughPlayersResultText;
+        if (ImGui.InputText("Not enough players text##Tod", ref notEnoughPlayersResultText, 512))
+        {
+            configuration.NotEnoughPlayersResultText = notEnoughPlayersResultText;
+            saveConfiguration();
+        }
+
         ImGui.Separator();
         ImGui.TextUnformatted("!tod2");
 
@@ -144,6 +165,14 @@ internal sealed class MainWindow : Window, IDisposable
             configuration.TodSecondPairMacroDurationSeconds = Math.Clamp(secondPairDuration, 1, 600);
             saveConfiguration();
         }
+
+        var secondPairLineDelay = configuration.TodSecondPairMacroLineDelayMilliseconds;
+        if (ImGui.InputInt("Line delay (ms)##Tod2", ref secondPairLineDelay))
+        {
+            configuration.TodSecondPairMacroLineDelayMilliseconds = Math.Clamp(secondPairLineDelay, 100, 10000);
+            saveConfiguration();
+        }
+        DrawHelpTooltip("Delay between !tod2 macro lines. Leave this alone unless chat lines are skipped.");
 
         var secondPairMacroText = configuration.TodSecondPairMacroText;
         if (ImGui.InputTextMultiline("Macro##Tod2", ref secondPairMacroText, 4096, new Vector2(0, 90 * ImGuiHelpers.GlobalScale)))
@@ -156,6 +185,13 @@ internal sealed class MainWindow : Window, IDisposable
         if (ImGui.InputTextMultiline("Result command##Tod2", ref secondPairResultCommandTemplate, 1024, new Vector2(0, 55 * ImGuiHelpers.GlobalScale)))
         {
             configuration.TodSecondPairResultCommandTemplate = secondPairResultCommandTemplate;
+            saveConfiguration();
+        }
+
+        var secondPairNotEnoughPlayersResultText = configuration.TodSecondPairNotEnoughPlayersResultText;
+        if (ImGui.InputText("Not enough second pair text##Tod2", ref secondPairNotEnoughPlayersResultText, 512))
+        {
+            configuration.TodSecondPairNotEnoughPlayersResultText = secondPairNotEnoughPlayersResultText;
             saveConfiguration();
         }
 
@@ -193,6 +229,10 @@ internal sealed class MainWindow : Window, IDisposable
 
     private string newTruthPrompt = string.Empty;
     private string newDarePrompt = string.Empty;
+    private int editingTruthSetIndex = -1;
+    private int editingDareSetIndex = -1;
+    private string editingTruthSetName = string.Empty;
+    private string editingDareSetName = string.Empty;
     private int newSpecialRuleRoll;
     private string newSpecialRuleText = string.Empty;
 
@@ -208,18 +248,152 @@ internal sealed class MainWindow : Window, IDisposable
         {
             if (ImGui.BeginTabItem("Truths"))
             {
-                DrawPromptList("Truth", configuration.TruthPrompts, ref newTruthPrompt);
+                DrawPromptSetTabs(
+                    "Truth",
+                    configuration.TruthPromptSets,
+                    ref newTruthPrompt,
+                    ref editingTruthSetIndex,
+                    ref editingTruthSetName);
                 ImGui.EndTabItem();
             }
 
             if (ImGui.BeginTabItem("Dares"))
             {
-                DrawPromptList("Dare", configuration.DarePrompts, ref newDarePrompt);
+                DrawPromptSetTabs(
+                    "Dare",
+                    configuration.DarePromptSets,
+                    ref newDarePrompt,
+                    ref editingDareSetIndex,
+                    ref editingDareSetName);
                 ImGui.EndTabItem();
             }
 
             ImGui.EndTabBar();
         }
+    }
+
+    private void DrawPromptSetTabs(
+        string label,
+        List<TodPromptSet> promptSets,
+        ref string newPrompt,
+        ref int editingSetIndex,
+        ref string editingSetName)
+    {
+        if (promptSets.Count == 0)
+        {
+            promptSets.Add(new TodPromptSet());
+            saveConfiguration();
+        }
+
+        if (ImGui.Button($"+##Add{label}Set"))
+        {
+            promptSets.Add(new TodPromptSet
+            {
+                Name = $"Set {promptSets.Count + 1}",
+                Enabled = true,
+                Prompts = [],
+            });
+            saveConfiguration();
+        }
+
+        ImGui.SameLine();
+        ImGui.TextUnformatted($"Active: {promptSets.Count(set => set.Enabled)} / {promptSets.Count}");
+        ImGui.Separator();
+
+        if (!ImGui.BeginTabBar($"{label}PromptSetTabs"))
+        {
+            return;
+        }
+
+        for (var i = 0; i < promptSets.Count; i++)
+        {
+            var promptSet = promptSets[i];
+            var enabledMarker = promptSet.Enabled ? "[X]" : "[ ]";
+            var tabName = string.IsNullOrWhiteSpace(promptSet.Name) ? $"Set {i + 1}" : promptSet.Name.Trim();
+
+            if (!ImGui.BeginTabItem($"{enabledMarker} {tabName}##{label}Set{i}"))
+            {
+                continue;
+            }
+
+            DrawPromptSet(label, promptSets, i, ref newPrompt, ref editingSetIndex, ref editingSetName);
+            ImGui.EndTabItem();
+        }
+
+        ImGui.EndTabBar();
+    }
+
+    private void DrawPromptSet(
+        string label,
+        List<TodPromptSet> promptSets,
+        int setIndex,
+        ref string newPrompt,
+        ref int editingSetIndex,
+        ref string editingSetName)
+    {
+        var promptSet = promptSets[setIndex];
+        promptSet.Prompts ??= [];
+
+        var enabled = promptSet.Enabled;
+        if (ImGui.Checkbox($"Enabled##{label}SetEnabled{setIndex}", ref enabled))
+        {
+            promptSet.Enabled = enabled;
+            promptSets[setIndex] = promptSet;
+            saveConfiguration();
+        }
+
+        ImGui.SameLine();
+
+        if (ImGui.Button($"Edit name##{label}SetEdit{setIndex}"))
+        {
+            editingSetIndex = setIndex;
+            editingSetName = promptSet.Name;
+        }
+
+        if (promptSets.Count > 1)
+        {
+            ImGui.SameLine();
+
+            if (ImGui.Button($"Delete set##{label}SetDelete{setIndex}"))
+            {
+                promptSets.RemoveAt(setIndex);
+                if (editingSetIndex == setIndex)
+                {
+                    editingSetIndex = -1;
+                    editingSetName = string.Empty;
+                }
+                saveConfiguration();
+                return;
+            }
+        }
+
+        if (editingSetIndex == setIndex)
+        {
+            ImGui.SetNextItemWidth(-1);
+            ImGui.InputText($"Set name##{label}SetName{setIndex}", ref editingSetName, 128);
+
+            if (ImGui.Button($"Save name##{label}SetSave{setIndex}"))
+            {
+                promptSet.Name = string.IsNullOrWhiteSpace(editingSetName)
+                    ? $"Set {setIndex + 1}"
+                    : editingSetName.Trim();
+                promptSets[setIndex] = promptSet;
+                editingSetIndex = -1;
+                editingSetName = string.Empty;
+                saveConfiguration();
+            }
+
+            ImGui.SameLine();
+
+            if (ImGui.Button($"Cancel##{label}SetCancel{setIndex}"))
+            {
+                editingSetIndex = -1;
+                editingSetName = string.Empty;
+            }
+        }
+
+        DrawPromptList(label, promptSet.Prompts, ref newPrompt);
+        promptSets[setIndex] = promptSet;
     }
 
     private void DrawPromptList(string label, List<string> prompts, ref string newPrompt)
@@ -364,6 +538,14 @@ internal sealed class MainWindow : Window, IDisposable
 
         DrawChatChannelCombo("Chat", configuration.WifiChatChannel, channel => configuration.WifiChatChannel = channel);
 
+        var wifiLineDelay = configuration.WifiMacroLineDelayMilliseconds;
+        if (ImGui.InputInt("Line delay (ms)##Wifi", ref wifiLineDelay))
+        {
+            configuration.WifiMacroLineDelayMilliseconds = Math.Clamp(wifiLineDelay, 100, 10000);
+            saveConfiguration();
+        }
+        DrawHelpTooltip("Delay between !wifi chat lines. Leave this alone unless chat lines are skipped.");
+
         var wifiMacroText = configuration.WifiMacroText;
         if (ImGui.InputTextMultiline("Macro##Wifi", ref wifiMacroText, 4096, new Vector2(0, 170 * ImGuiHelpers.GlobalScale)))
         {
@@ -447,6 +629,11 @@ internal sealed class MainWindow : Window, IDisposable
             saveConfiguration();
         }
 
+        if (ImGui.Button("Open config folder"))
+        {
+            OpenConfigFolder();
+        }
+
         DrawSettingsSection("Wifi");
 
         var wifiEnabled = configuration.WifiEnabled;
@@ -477,6 +664,32 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.Spacing();
         ImGui.TextUnformatted(title);
         ImGui.Spacing();
+    }
+
+    private static void DrawHelpTooltip(string text)
+    {
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(text);
+        }
+    }
+
+    private void OpenConfigFolder()
+    {
+        try
+        {
+            var configDirectory = pluginInterface.GetPluginConfigDirectory();
+            Directory.CreateDirectory(configDirectory);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = configDirectory,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            chatGui.PrintError($"Could not open config folder: {ex.Message}", "RollTracker");
+        }
     }
 
     private static void DrawSummaryLine(string label, RollEntry? roll)

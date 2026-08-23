@@ -16,6 +16,8 @@ internal sealed partial class RollTrackerService : IDisposable
     private const string DefaultSecondPairMacroText = "/y ♦ Time for Truth or Dare 2 ♦  Highest asks lowest, second highest asks second lowest,  \"Truth or Dare?\" Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
     private const string LegacySecondPairResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll}) 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})";
     private const string DefaultSecondPairResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})\n/y 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})";
+    private const int HelpInitialDelayMilliseconds = 500;
+    private const int HelpLineDelayMilliseconds = 2000;
 
     private readonly IChatGui chatGui;
     private readonly ICommandManager commandManager;
@@ -159,6 +161,18 @@ internal sealed partial class RollTrackerService : IDisposable
 
     private List<string> BuildResultCommands(RollEntry highest, RollEntry lowest)
     {
+        if (rolls.Count < 2)
+        {
+            return BuildNotEnoughPlayersResultCommands(DefaultResultCommandTemplate);
+        }
+
+        var resultCommands = BuildPrimaryPairResultCommands(highest, lowest);
+        AppendSpecialRuleCommands(resultCommands, 0, BuildTodSpecialRuleTexts());
+        return resultCommands;
+    }
+
+    private List<string> BuildPrimaryPairResultCommands(RollEntry highest, RollEntry lowest)
+    {
         var resultCommand = BuildResultCommand(highest, lowest);
         var resultCommands = SplitCommandLines(resultCommand);
         if (resultCommands.Count == 0)
@@ -166,7 +180,6 @@ internal sealed partial class RollTrackerService : IDisposable
             resultCommands.Add(BuildResultCommandFromTemplate(DefaultResultCommandTemplate, highest, lowest));
         }
 
-        AppendSpecialRuleCommands(resultCommands, 0, BuildTodSpecialRuleTexts());
         return resultCommands;
     }
 
@@ -181,9 +194,17 @@ internal sealed partial class RollTrackerService : IDisposable
 
     private List<string> BuildSecondPairResultCommands(RollEntry highest, RollEntry lowest)
     {
+        if (rolls.Count < 2)
+        {
+            return BuildNotEnoughPlayersResultCommands(DefaultSecondPairResultCommandTemplate);
+        }
+
         if (!TryGetTodSecondPair(highest, lowest, out var secondHighest, out var secondLowest))
         {
-            return BuildResultCommands(highest, lowest);
+            var partialResultCommands = BuildPrimaryPairResultCommands(highest, lowest);
+            AppendSecondPairNotEnoughPlayersResultCommands(partialResultCommands);
+            AppendSpecialRuleCommands(partialResultCommands, 0, BuildTodSpecialRuleTexts());
+            return partialResultCommands;
         }
 
         var template = string.IsNullOrWhiteSpace(configuration.TodSecondPairResultCommandTemplate)
@@ -213,6 +234,43 @@ internal sealed partial class RollTrackerService : IDisposable
         AppendSpecialRuleCommands(resultCommands, resultCommands.Count - 1, BuildTodSpecialRuleTexts());
 
         return resultCommands;
+    }
+
+    private List<string> BuildNotEnoughPlayersResultCommands(string fallbackCommandTemplate)
+    {
+        var commandPrefix = GetCommandPrefix(fallbackCommandTemplate);
+        var resultCommands = BuildTextResultCommands(configuration.NotEnoughPlayersResultText, commandPrefix);
+        if (resultCommands.Count == 0)
+        {
+            resultCommands.Add($"{commandPrefix} Not enough players for a round.");
+        }
+
+        return resultCommands;
+    }
+
+    private void AppendSecondPairNotEnoughPlayersResultCommands(List<string> resultCommands)
+    {
+        var commandPrefix = resultCommands.Count > 0
+            ? GetCommandPrefix(resultCommands[0])
+            : GetCommandPrefix(DefaultSecondPairResultCommandTemplate);
+        var notEnoughCommands = BuildTextResultCommands(configuration.TodSecondPairNotEnoughPlayersResultText, commandPrefix);
+
+        if (notEnoughCommands.Count == 0)
+        {
+            resultCommands.Add($"{commandPrefix} 2nd: Not enough players for second pair.");
+            return;
+        }
+
+        resultCommands.AddRange(notEnoughCommands);
+    }
+
+    private static List<string> BuildTextResultCommands(string text, string commandPrefix)
+    {
+        return SplitCommandLines(text)
+            .Select(line => line.StartsWith("/", StringComparison.Ordinal)
+                ? line
+                : $"{commandPrefix} {line}")
+            .ToList();
     }
 
     private static string BuildResultCommandFromTemplate(string template, RollEntry highest, RollEntry lowest)
@@ -592,13 +650,13 @@ internal sealed partial class RollTrackerService : IDisposable
 
         if (configuration.TruthTriggerEnabled && IsTruthTrigger(message))
         {
-            SendRandomTodPrompt("Truth", configuration.TruthPrompts);
+            SendRandomTodPrompt("Truth", configuration.TruthPromptSets);
             return;
         }
 
         if (configuration.DareTriggerEnabled && IsDareTrigger(message))
         {
-            SendRandomTodPrompt("Dare", configuration.DarePrompts);
+            SendRandomTodPrompt("Dare", configuration.DarePromptSets);
             return;
         }
 
@@ -808,7 +866,7 @@ internal sealed partial class RollTrackerService : IDisposable
             chatGui.PrintError($"Could not run macro line: {step.Command}", "RollTracker");
         }
 
-        nextMacroStepAt = DateTimeOffset.Now.AddMilliseconds(Math.Clamp(configuration.MacroLineDelayMilliseconds, 100, 10000));
+        nextMacroStepAt = DateTimeOffset.Now.AddMilliseconds(GetCurrentTodMacroLineDelayMilliseconds());
     }
 
     private void ExecuteNextWifiMacroStep()
@@ -826,7 +884,19 @@ internal sealed partial class RollTrackerService : IDisposable
             chatGui.PrintError($"Could not run !wifi macro line: {step.Command}", "RollTracker");
         }
 
-        nextWifiMacroStepAt = DateTimeOffset.Now.AddMilliseconds(Math.Clamp(configuration.MacroLineDelayMilliseconds, 100, 10000));
+        nextWifiMacroStepAt = DateTimeOffset.Now.AddMilliseconds(ClampMacroLineDelay(configuration.WifiMacroLineDelayMilliseconds));
+    }
+
+    private int GetCurrentTodMacroLineDelayMilliseconds()
+    {
+        return currentRoundKind == RoundKind.SecondPair
+            ? ClampMacroLineDelay(configuration.TodSecondPairMacroLineDelayMilliseconds)
+            : ClampMacroLineDelay(configuration.MacroLineDelayMilliseconds);
+    }
+
+    private static int ClampMacroLineDelay(int delayMilliseconds)
+    {
+        return Math.Clamp(delayMilliseconds <= 0 ? 1000 : delayMilliseconds, 100, 10000);
     }
 
     private void ExecuteNextTodPromptCommand()
@@ -907,9 +977,11 @@ internal sealed partial class RollTrackerService : IDisposable
         }
     }
 
-    private void SendRandomTodPrompt(string promptType, IReadOnlyList<string> prompts)
+    private void SendRandomTodPrompt(string promptType, IReadOnlyList<TodPromptSet> promptSets)
     {
-        var usablePrompts = prompts
+        var usablePrompts = promptSets
+            .Where(promptSet => promptSet.Enabled)
+            .SelectMany(promptSet => promptSet.Prompts)
             .Select(prompt => prompt.Trim())
             .Where(prompt => !string.IsNullOrWhiteSpace(prompt))
             .ToList();
@@ -937,7 +1009,7 @@ internal sealed partial class RollTrackerService : IDisposable
             pendingTodPromptCommands.Enqueue(new DelayedCommand(
                 $"{chatCommand} {helpLines[i]}",
                 "Help",
-                DateTimeOffset.Now.AddMilliseconds(500 + (i * 800))));
+                DateTimeOffset.Now.AddMilliseconds(HelpInitialDelayMilliseconds + (i * HelpLineDelayMilliseconds))));
         }
     }
 

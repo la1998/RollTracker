@@ -19,28 +19,35 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandHelp =
         "Commands:\n" +
         "/rt - open or close the window.\n" +
-        "/rt on - enable all modules.\n" +
-        "/rt off - disable all modules.\n" +
-        "/rt on tod - enable Truth or Dare.\n" +
-        "/rt off tod - disable Truth or Dare.\n" +
-        "/rt on todrules - enable Truth or Dare special rules.\n" +
-        "/rt off todrules - disable Truth or Dare special rules.\n" +
-        "/rt on todsecond - enable !tod2 second pair rounds.\n" +
-        "/rt off todsecond - disable !tod2 second pair rounds.\n" +
-        "/rt on truth - enable !truth.\n" +
-        "/rt off truth - disable !truth.\n" +
-        "/rt on dare - enable !dare.\n" +
-        "/rt off dare - disable !dare.\n" +
-        "/rt on help - enable !help.\n" +
-        "/rt off help - disable !help.\n" +
-        "/rt on wifi - enable !wifi.\n" +
-        "/rt off wifi - disable !wifi.\n" +
-        "/rt status - show module states.\n" +
-        "/rt reset - clear the current roll list.\n" +
-        "/rt end - send the current result, then clear the list.\n" +
-        "/rt add <number> - add a manual test roll to the running round.\n" +
-        "/rt test - add sample rolls for checking the UI.";
-    private const string AliasCommandHelp = "Alias for /rt. Use /rt to see the full command list.";
+        "/rt help - show RollTracker commands locally.";
+    private const string AliasCommandHelp = "Alias for /rt. Use /rt help to see the command list.";
+    private static readonly string[] CommandHelpLines =
+    [
+        "/rt - open or close the window.",
+        "/rt help - show this command list locally.",
+        "/rt on - enable all modules.",
+        "/rt off - disable all modules.",
+        "/rt on tod - enable Truth or Dare.",
+        "/rt off tod - disable Truth or Dare.",
+        "/rt on todrules - enable Truth or Dare special rules.",
+        "/rt off todrules - disable Truth or Dare special rules.",
+        "/rt on todsecond - enable !tod2 second pair rounds.",
+        "/rt off todsecond - disable !tod2 second pair rounds.",
+        "/rt on truth - enable !truth.",
+        "/rt off truth - disable !truth.",
+        "/rt on dare - enable !dare.",
+        "/rt off dare - disable !dare.",
+        "/rt on help - enable !help.",
+        "/rt off help - disable !help.",
+        "/rt on wifi - enable !wifi.",
+        "/rt off wifi - disable !wifi.",
+        "/rt status - show module states.",
+        "/rt reset - clear the current roll list.",
+        "/rt end - send the current result, then clear the list.",
+        "/rt add <number> - add a manual test roll to the running round.",
+        "/rt test - add sample rolls for checking the UI.",
+        "/rolltracker - supports the same commands as /rt.",
+    ];
 
     [PluginService]
     internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
@@ -86,7 +93,7 @@ public sealed class Plugin : IDalamudPlugin
             Log,
             Configuration,
             SaveConfiguration);
-        MainWindow = new MainWindow(RollTrackerService, Configuration, SaveConfiguration);
+        MainWindow = new MainWindow(RollTrackerService, Configuration, PluginInterface, ChatGui, SaveConfiguration);
         ChangelogWindow = new ChangelogWindow(Configuration, SaveConfiguration, GetPluginVersion());
 
         WindowSystem.AddWindow(MainWindow);
@@ -124,6 +131,12 @@ public sealed class Plugin : IDalamudPlugin
     private void OnCommand(string command, string args)
     {
         var trimmedArgs = args.Trim();
+
+        if (trimmedArgs.Equals("help", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandHelp();
+            return;
+        }
 
         if (trimmedArgs.Equals("clear", StringComparison.OrdinalIgnoreCase) ||
             trimmedArgs.Equals("reset", StringComparison.OrdinalIgnoreCase))
@@ -173,6 +186,16 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         ToggleMainUi();
+    }
+
+    private static void PrintCommandHelp()
+    {
+        ChatGui.Print("RollTracker commands:", "RollTracker");
+
+        foreach (var line in CommandHelpLines)
+        {
+            ChatGui.Print(line, "RollTracker");
+        }
     }
 
     private bool TryHandleModuleToggle(string args, bool enabled)
@@ -316,22 +339,26 @@ public sealed class Plugin : IDalamudPlugin
             changed = true;
         }
 
+        if (string.IsNullOrWhiteSpace(Configuration.NotEnoughPlayersResultText))
+        {
+            Configuration.NotEnoughPlayersResultText = "Not enough players for a round.";
+            changed = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(Configuration.TodSecondPairNotEnoughPlayersResultText))
+        {
+            Configuration.TodSecondPairNotEnoughPlayersResultText = "2nd: Not enough players for second pair.";
+            changed = true;
+        }
+
         Configuration.TruthPrompts ??= [];
         Configuration.DarePrompts ??= [];
         changed |= RemoveDuplicatePrompts(Configuration.TruthPrompts);
         changed |= RemoveDuplicatePrompts(Configuration.DarePrompts);
-
-        if (Configuration.TruthPrompts.Count == 0)
-        {
-            Configuration.TruthPrompts.AddRange(Configuration.CreateDefaultTruthPrompts());
-            changed = true;
-        }
-
-        if (Configuration.DarePrompts.Count == 0)
-        {
-            Configuration.DarePrompts.AddRange(Configuration.CreateDefaultDarePrompts());
-            changed = true;
-        }
+        Configuration.TruthPromptSets ??= [];
+        Configuration.DarePromptSets ??= [];
+        changed |= MigratePromptSets(Configuration.TruthPromptSets, Configuration.TruthPrompts, Configuration.CreateDefaultTruthPrompts());
+        changed |= MigratePromptSets(Configuration.DarePromptSets, Configuration.DarePrompts, Configuration.CreateDefaultDarePrompts());
 
         if (Configuration.TodSpecialRules is null)
         {
@@ -391,6 +418,41 @@ public sealed class Plugin : IDalamudPlugin
         prompts.Clear();
         prompts.AddRange(deduplicatedPrompts);
         return true;
+    }
+
+    private static bool MigratePromptSets(List<TodPromptSet> promptSets, List<string> legacyPrompts, List<string> defaultPrompts)
+    {
+        var changed = false;
+
+        if (promptSets.Count == 0)
+        {
+            var prompts = legacyPrompts.Count > 0
+                ? legacyPrompts
+                : defaultPrompts;
+            promptSets.Add(new TodPromptSet
+            {
+                Name = "Set 1",
+                Enabled = true,
+                Prompts = [.. prompts],
+            });
+            changed = true;
+        }
+
+        for (var i = 0; i < promptSets.Count; i++)
+        {
+            var promptSet = promptSets[i];
+            if (string.IsNullOrWhiteSpace(promptSet.Name))
+            {
+                promptSet.Name = $"Set {i + 1}";
+                changed = true;
+            }
+
+            promptSet.Prompts ??= [];
+            changed |= RemoveDuplicatePrompts(promptSet.Prompts);
+            promptSets[i] = promptSet;
+        }
+
+        return changed;
     }
 
     private bool RemoveDuplicateSpecialRules()

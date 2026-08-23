@@ -19,11 +19,12 @@ RollTracker publishes stable builds through `dist/RollTracker/latest.zip` and te
 To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's Experimental settings. Testing builds are offered only when `TestingAssemblyVersion` in `repo.json` is higher than the stable `AssemblyVersion`.
 
 Current stable: `0.1.0.38`
-Current testing: `0.1.0.38`
+Current testing: `0.1.0.39`
 
 ## Commands
 
 - `/rt` - opens or closes the window.
+- `/rt help` - shows the full command list locally as RollTracker plugin messages.
 - `/rt on` - enables all modules.
 - `/rt off` - disables all modules.
 - `/rt on tod` - enables Truth or Dare, `!truth`, and `!dare`.
@@ -47,7 +48,7 @@ Current testing: `0.1.0.38`
 - `/rt test` - adds four fake rolls so you can check the UI.
 - `/rolltracker` - supports the same commands as `/rt`.
 
-These commands are also listed in the Dalamud plugin installer description and in Dalamud command help.
+The Dalamud plugin installer lists only `/rt` and `/rt help` to keep the installer page readable.
 
 When their toggles are enabled, chat triggers `!truth` and `!dare` are active. They ignore casing and send one random entry from the configured Truth or Dare lists to the selected chat channel.
 
@@ -69,13 +70,13 @@ When their toggles are enabled, chat triggers `!truth` and `!dare` are active. T
 
 The window also has `Auto off outside house`. When enabled, RollTracker turns itself off automatically when you leave a housing interior.
 
-The normal result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. The `!tod2` result command also supports `{secondHighest}`, `{secondLowest}`, `{secondHighestRoll}`, and `{secondLowestRoll}`. Each non-empty `!tod2` result command line is sent as its own chat message, so the default result sends the highest/lowest pair and the second pair separately.
+The normal result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. The `!tod2` result command also supports `{secondHighest}`, `{secondLowest}`, `{secondHighestRoll}`, and `{secondLowestRoll}`. Each non-empty `!tod2` result command line is sent as its own chat message, so the default result sends the highest/lowest pair and the second pair separately. The fallback texts for too few players in `!tod` and too few players for the second `!tod2` pair are editable in the Truth or Dare tab.
 
 The `Special Rules` tab lets you enable or disable special rules, edit the default rules for rolls 0, 1, and 999, and add or delete custom roll-number rules. Special rule text supports `{player}`, `{roll}`, and `{role}`. Matching rule texts are sent as separate chat messages after the normal result line instead of being appended to it. `Do not trigger with` accepts comma- or space-separated roll numbers that suppress that rule when those numbers are also in the pair.
 
 `!wifi` is a separate trigger with its own tab, enabled switch, macro text, and chat target. It can send to Yell, Say, or Party and is also turned off automatically when you leave a housing interior.
 
-The `Truth / Dare` tab lets you choose the chat channel and add, edit, and delete the prompt lists used by `!truth` and `!dare`. Truth and Dare prompts include default starter lists.
+The `Truth / Dare` tab lets you choose the chat channel and add, edit, and delete the prompt lists used by `!truth` and `!dare`. Truths and Dares are organized into editable sets. `Set 1` contains the default starter list, new sets start empty, and only enabled sets are combined for random prompt selection.
 
 The `Settings` tab groups controls into Truth or Dare, Truth / Dare Suggestions, General, Wifi, and Global sections.
 
