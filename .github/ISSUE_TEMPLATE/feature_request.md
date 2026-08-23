@@ -3,15 +3,18 @@ name: Feature request
 about: Suggest an idea for this project
 title: ''
 labels: enhancement
-assignees: ''
+assignees: la1998
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+**What feature would you like to see added?**
+Please describe your idea as clearly as possible.
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+**Why would this be useful?**
+Explain how this feature would help you or other RollTracker users.
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+**How should it work?**
+Describe how you imagine the feature working.
+
+**Additional information**
+Add anything else that might help explain your idea.
