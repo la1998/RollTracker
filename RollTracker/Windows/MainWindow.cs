@@ -678,6 +678,7 @@ internal sealed class MainWindow : Window, IDisposable
     {
         try
         {
+            saveConfiguration();
             var configDirectory = pluginInterface.GetPluginConfigDirectory();
             Directory.CreateDirectory(configDirectory);
             Process.Start(new ProcessStartInfo

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
@@ -82,7 +84,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin()
     {
-        Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        Configuration = LoadConfiguration();
         MigrateConfiguration();
         RollTrackerService = new RollTrackerService(
             ChatGui,
@@ -325,7 +327,52 @@ public sealed class Plugin : IDalamudPlugin
 
     private void SaveConfiguration()
     {
-        PluginInterface.SavePluginConfig(Configuration);
+        try
+        {
+            var configFile = GetPluginConfigFilePath();
+            var configDirectory = Path.GetDirectoryName(configFile);
+            if (!string.IsNullOrWhiteSpace(configDirectory))
+            {
+                Directory.CreateDirectory(configDirectory);
+            }
+
+            var json = JsonSerializer.Serialize(Configuration, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+            });
+            File.WriteAllText(configFile, json);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to save RollTracker config.");
+            ChatGui.PrintError($"Could not save RollTracker config: {ex.Message}", "RollTracker");
+        }
+    }
+
+    private static Configuration LoadConfiguration()
+    {
+        try
+        {
+            var configFile = GetPluginConfigFilePath();
+            if (!File.Exists(configFile))
+            {
+                return new Configuration();
+            }
+
+            var configJson = File.ReadAllText(configFile);
+            return JsonSerializer.Deserialize<Configuration>(configJson) ?? new Configuration();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to load RollTracker config.");
+            ChatGui.PrintError($"Could not load RollTracker config from plugin folder: {ex.Message}", "RollTracker");
+            return new Configuration();
+        }
+    }
+
+    private static string GetPluginConfigFilePath()
+    {
+        return Path.Combine(PluginInterface.GetPluginConfigDirectory(), PluginInterface.ConfigFile.Name);
     }
 
     private void MigrateConfiguration()
