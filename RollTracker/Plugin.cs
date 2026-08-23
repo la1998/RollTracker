@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
@@ -338,6 +339,7 @@ public sealed class Plugin : IDalamudPlugin
 
             var json = JsonSerializer.Serialize(Configuration, new JsonSerializerOptions
             {
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                 WriteIndented = true,
             });
             File.WriteAllText(configFile, json);

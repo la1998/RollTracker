@@ -12,6 +12,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 {
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.42", "Testing bug fix: config files now save readable Unicode symbols instead of escaped sequences."),
         new("0.1.0.41", "Testing bug fix: RollTracker now stores and reads its active config from the plugin config folder."),
         new("0.1.0.39", "Testing update: safer help output timing, separate macro line delays, local /rt help, config folder shortcut, too-few-player result texts, and Truth/Dare prompt sets."),
         new("0.1.0.37", "Bug fix: default prompt and special rule lists no longer duplicate on future loads."),
