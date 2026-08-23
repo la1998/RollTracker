@@ -124,31 +124,22 @@ internal sealed partial class RollTrackerService : IDisposable
         roundEndsAt = null;
         pendingMacroSteps.Clear();
 
-        if (rolls.Count == 0)
-        {
-            chatGui.Print("No rolls recorded for this round.", "RollTracker");
-            return;
-        }
-
-        var highest = HighestRoll;
-        var lowest = LowestRoll;
-
-        if (highest is null || lowest is null)
-        {
-            return;
-        }
-
-        var resultCommands = currentRoundKind == RoundKind.SecondPair
-            ? BuildSecondPairResultCommands(highest, lowest)
-            : BuildResultCommands(highest, lowest);
+        var resultCommands = BuildRoundResultCommands();
         var anyCommandFailed = false;
         foreach (var resultCommand in resultCommands)
         {
-            if (!TryExecuteTextCommand(resultCommand))
+            if (resultCommand.IsSpecialRule)
+            {
+                continue;
+            }
+
+            if (!TryExecuteTextCommand(resultCommand.Command))
             {
                 anyCommandFailed = true;
             }
         }
+
+        QueueSpecialRuleResultCommands(resultCommands);
 
         if (anyCommandFailed)
         {
@@ -159,11 +150,62 @@ internal sealed partial class RollTrackerService : IDisposable
         currentRoundKind = RoundKind.Normal;
     }
 
-    private List<string> BuildResultCommands(RollEntry highest, RollEntry lowest)
+    private void QueueSpecialRuleResultCommands(IEnumerable<RoundResultCommand> resultCommands)
+    {
+        var delayMilliseconds = ClampMacroLineDelay(configuration.TodSpecialRuleLineDelayMilliseconds);
+        var nextExecuteAt = DateTimeOffset.Now.AddMilliseconds(delayMilliseconds);
+
+        foreach (var resultCommand in resultCommands.Where(command => command.IsSpecialRule))
+        {
+            pendingTodPromptCommands.Enqueue(new DelayedCommand(resultCommand.Command, "Special rule result", nextExecuteAt));
+            nextExecuteAt = nextExecuteAt.AddMilliseconds(delayMilliseconds);
+        }
+    }
+
+    private List<RoundResultCommand> BuildRoundResultCommands()
+    {
+        if (rolls.Count == 0)
+        {
+            return currentRoundKind == RoundKind.SecondPair
+                ? BuildNotEnoughPlayersResultCommands(
+                    configuration.TodSecondPairNotEnoughRoundPlayersResultText,
+                    DefaultSecondPairResultCommandTemplate,
+                    "Not enough players for a !tod2 round.")
+                : BuildNotEnoughPlayersResultCommands(
+                    configuration.NotEnoughPlayersResultText,
+                    DefaultResultCommandTemplate,
+                    "Not enough players for a round.");
+        }
+
+        var highest = HighestRoll;
+        var lowest = LowestRoll;
+
+        if (highest is null || lowest is null)
+        {
+            return currentRoundKind == RoundKind.SecondPair
+                ? BuildNotEnoughPlayersResultCommands(
+                    configuration.TodSecondPairNotEnoughRoundPlayersResultText,
+                    DefaultSecondPairResultCommandTemplate,
+                    "Not enough players for a !tod2 round.")
+                : BuildNotEnoughPlayersResultCommands(
+                    configuration.NotEnoughPlayersResultText,
+                    DefaultResultCommandTemplate,
+                    "Not enough players for a round.");
+        }
+
+        return currentRoundKind == RoundKind.SecondPair
+            ? BuildSecondPairResultCommands(highest, lowest)
+            : BuildResultCommands(highest, lowest);
+    }
+
+    private List<RoundResultCommand> BuildResultCommands(RollEntry highest, RollEntry lowest)
     {
         if (rolls.Count < 2)
         {
-            return BuildNotEnoughPlayersResultCommands(DefaultResultCommandTemplate);
+            return BuildNotEnoughPlayersResultCommands(
+                configuration.NotEnoughPlayersResultText,
+                DefaultResultCommandTemplate,
+                "Not enough players for a round.");
         }
 
         var resultCommands = BuildPrimaryPairResultCommands(highest, lowest);
@@ -171,13 +213,15 @@ internal sealed partial class RollTrackerService : IDisposable
         return resultCommands;
     }
 
-    private List<string> BuildPrimaryPairResultCommands(RollEntry highest, RollEntry lowest)
+    private List<RoundResultCommand> BuildPrimaryPairResultCommands(RollEntry highest, RollEntry lowest)
     {
         var resultCommand = BuildResultCommand(highest, lowest);
-        var resultCommands = SplitCommandLines(resultCommand);
+        var resultCommands = BuildNormalResultCommands(resultCommand);
         if (resultCommands.Count == 0)
         {
-            resultCommands.Add(BuildResultCommandFromTemplate(DefaultResultCommandTemplate, highest, lowest));
+            resultCommands.Add(new RoundResultCommand(
+                BuildResultCommandFromTemplate(DefaultResultCommandTemplate, highest, lowest),
+                false));
         }
 
         return resultCommands;
@@ -192,11 +236,14 @@ internal sealed partial class RollTrackerService : IDisposable
         return BuildResultCommandFromTemplate(template, highest, lowest);
     }
 
-    private List<string> BuildSecondPairResultCommands(RollEntry highest, RollEntry lowest)
+    private List<RoundResultCommand> BuildSecondPairResultCommands(RollEntry highest, RollEntry lowest)
     {
         if (rolls.Count < 2)
         {
-            return BuildNotEnoughPlayersResultCommands(DefaultSecondPairResultCommandTemplate);
+            return BuildNotEnoughPlayersResultCommands(
+                configuration.TodSecondPairNotEnoughRoundPlayersResultText,
+                DefaultSecondPairResultCommandTemplate,
+                "Not enough players for a !tod2 round.");
         }
 
         if (!TryGetTodSecondPair(highest, lowest, out var secondHighest, out var secondLowest))
@@ -225,7 +272,7 @@ internal sealed partial class RollTrackerService : IDisposable
             .Replace("{secondHighestRoll}", secondHighest.Value.ToString(), StringComparison.OrdinalIgnoreCase)
             .Replace("{secondLowestRoll}", secondLowest.Value.ToString(), StringComparison.OrdinalIgnoreCase);
 
-        var resultCommands = SplitCommandLines(result);
+        var resultCommands = BuildNormalResultCommands(result);
         if (resultCommands.Count == 0)
         {
             return BuildResultCommands(highest, lowest);
@@ -236,40 +283,51 @@ internal sealed partial class RollTrackerService : IDisposable
         return resultCommands;
     }
 
-    private List<string> BuildNotEnoughPlayersResultCommands(string fallbackCommandTemplate)
+    private static List<RoundResultCommand> BuildNotEnoughPlayersResultCommands(
+        string text,
+        string fallbackCommandTemplate,
+        string fallbackText)
     {
         var commandPrefix = GetCommandPrefix(fallbackCommandTemplate);
-        var resultCommands = BuildTextResultCommands(configuration.NotEnoughPlayersResultText, commandPrefix);
+        var resultCommands = BuildTextResultCommands(text, commandPrefix);
         if (resultCommands.Count == 0)
         {
-            resultCommands.Add($"{commandPrefix} Not enough players for a round.");
+            resultCommands.Add(new RoundResultCommand($"{commandPrefix} {fallbackText}", false));
         }
 
         return resultCommands;
     }
 
-    private void AppendSecondPairNotEnoughPlayersResultCommands(List<string> resultCommands)
+    private void AppendSecondPairNotEnoughPlayersResultCommands(List<RoundResultCommand> resultCommands)
     {
         var commandPrefix = resultCommands.Count > 0
-            ? GetCommandPrefix(resultCommands[0])
+            ? GetCommandPrefix(resultCommands[0].Command)
             : GetCommandPrefix(DefaultSecondPairResultCommandTemplate);
         var notEnoughCommands = BuildTextResultCommands(configuration.TodSecondPairNotEnoughPlayersResultText, commandPrefix);
 
         if (notEnoughCommands.Count == 0)
         {
-            resultCommands.Add($"{commandPrefix} 2nd: Not enough players for second pair.");
+            resultCommands.Add(new RoundResultCommand($"{commandPrefix} 2nd: Not enough players for second pair.", false));
             return;
         }
 
         resultCommands.AddRange(notEnoughCommands);
     }
 
-    private static List<string> BuildTextResultCommands(string text, string commandPrefix)
+    private static List<RoundResultCommand> BuildNormalResultCommands(string commandText)
+    {
+        return SplitCommandLines(commandText)
+            .Select(command => new RoundResultCommand(command, false))
+            .ToList();
+    }
+
+    private static List<RoundResultCommand> BuildTextResultCommands(string text, string commandPrefix)
     {
         return SplitCommandLines(text)
             .Select(line => line.StartsWith("/", StringComparison.Ordinal)
                 ? line
                 : $"{commandPrefix} {line}")
+            .Select(command => new RoundResultCommand(command, false))
             .ToList();
     }
 
@@ -290,17 +348,17 @@ internal sealed partial class RollTrackerService : IDisposable
             .ToList();
     }
 
-    private static void AppendSpecialRuleCommands(List<string> commands, int sourceCommandIndex, IEnumerable<string> specialRuleTexts)
+    private static void AppendSpecialRuleCommands(List<RoundResultCommand> commands, int sourceCommandIndex, IEnumerable<string> specialRuleTexts)
     {
         if (sourceCommandIndex < 0 || sourceCommandIndex >= commands.Count)
         {
             return;
         }
 
-        var commandPrefix = GetCommandPrefix(commands[sourceCommandIndex]);
+        var commandPrefix = GetCommandPrefix(commands[sourceCommandIndex].Command);
         foreach (var specialRuleText in specialRuleTexts.Where(text => !string.IsNullOrWhiteSpace(text)))
         {
-            commands.Add($"{commandPrefix} {specialRuleText}");
+            commands.Add(new RoundResultCommand($"{commandPrefix} {specialRuleText}", true));
         }
     }
 
@@ -1225,6 +1283,8 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly record struct MacroStep(string Command, int WaitMilliseconds);
 
     private readonly record struct DelayedCommand(string Command, string PromptType, DateTimeOffset ExecuteAt);
+
+    private readonly record struct RoundResultCommand(string Command, bool IsSpecialRule);
 
     private enum RoundKind
     {

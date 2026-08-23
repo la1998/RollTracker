@@ -4,9 +4,9 @@
   "Name": "RollTracker",
   "InternalName": "RollTracker",
   "AssemblyVersion": "0.1.0.38",
-  "TestingAssemblyVersion": "0.1.0.42",
+  "TestingAssemblyVersion": "0.1.0.43",
   "TestingDalamudApiLevel": 15,
-  "TestingChangelog": "Testing bug fix: config files now save readable Unicode symbols instead of escaped sequences.",
+  "TestingChangelog": "Testing update: separate !tod2 not-enough-player fallback, visible fallback commands, and delayed Special Rule result output.",
   "Description": "Reads chat messages, detects /random rolls, tracks Truth or Dare rounds, and provides configurable !truth, !dare, !help, !tod2, and !wifi helpers.\n\nCommands:\n/rt - open or close the window.\n/rt help - show the full command and trigger list locally.",
   "ApplicableVersion": "any",
   "Tags": [
@@ -23,9 +23,9 @@
   "Punchline": "Tracks /random rolls for private round games.",
   "AcceptsFeedback": false,
   "DownloadLinkInstall": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
-  "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.42",
+  "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.43",
   "DownloadLinkUpdate": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
   "RepoUrl": "https://github.com/la1998/RollTracker",
-  "LastUpdate": "1787488769"
+  "LastUpdate": "1787491837"
 }
 ]

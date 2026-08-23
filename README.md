@@ -19,7 +19,7 @@ RollTracker publishes stable builds through `dist/RollTracker/latest.zip` and te
 To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's Experimental settings. Testing builds are offered only when `TestingAssemblyVersion` in `repo.json` is higher than the stable `AssemblyVersion`.
 
 Current stable: `0.1.0.38`
-Current testing: `0.1.0.42`
+Current testing: `0.1.0.43`
 
 ## Commands
 
@@ -72,9 +72,9 @@ The window also has `Auto off outside house`. When enabled, RollTracker turns it
 
 The Settings tab can open the plugin config folder. RollTracker stores its active config in that plugin folder; older root-level Dalamud config files are left untouched as backups and can be copied into the folder manually if needed.
 
-The normal result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. The `!tod2` result command also supports `{secondHighest}`, `{secondLowest}`, `{secondHighestRoll}`, and `{secondLowestRoll}`. Each non-empty `!tod2` result command line is sent as its own chat message, so the default result sends the highest/lowest pair and the second pair separately. The fallback texts for too few players in `!tod` and too few players for the second `!tod2` pair are editable in the Truth or Dare tab.
+The normal result command can be edited in the window. Supported placeholders are `{highest}`, `{lowest}`, `{highestRoll}`, and `{lowestRoll}`. The `!tod2` result command also supports `{secondHighest}`, `{secondLowest}`, `{secondHighestRoll}`, and `{secondLowestRoll}`. Each non-empty `!tod2` result command line is sent as its own chat message, so the default result sends the highest/lowest pair and the second pair separately. The fallback commands for too few players in `!tod`, too few players in `!tod2`, and too few players for the second `!tod2` pair are editable in the Truth or Dare tab.
 
-The `Special Rules` tab lets you enable or disable special rules, edit the default rules for rolls 0, 1, and 999, and add or delete custom roll-number rules. Special rule text supports `{player}`, `{roll}`, and `{role}`. Matching rule texts are sent as separate chat messages after the normal result line instead of being appended to it. `Do not trigger with` accepts comma- or space-separated roll numbers that suppress that rule when those numbers are also in the pair.
+The `Special Rules` tab lets you edit the default rules for rolls 0, 1, and 999, add or delete custom roll-number rules, and set how much delay is used before and between Special Rule result lines. Special rule text supports `{player}`, `{roll}`, and `{role}`. Matching rule texts are sent as separate delayed chat messages after the normal result line instead of being appended to it. `Do not trigger with` accepts comma- or space-separated roll numbers that suppress that rule when those numbers are also in the pair. The Settings tab controls whether Special Rules are enabled.
 
 `!wifi` is a separate trigger with its own tab, enabled switch, macro text, and chat target. It can send to Yell, Say, or Party and is also turned off automatically when you leave a housing interior.
 

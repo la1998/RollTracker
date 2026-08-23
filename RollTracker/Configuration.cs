@@ -33,17 +33,21 @@ public sealed class Configuration : IPluginConfiguration
 
     public int TodSecondPairMacroLineDelayMilliseconds { get; set; } = 1000;
 
+    public int TodSpecialRuleLineDelayMilliseconds { get; set; } = 1000;
+
     public string MacroText { get; set; } = "/y ♦ Time for Truth or Dare ♦  Highest number asks the lowest number, \"Truth or Dare?\"  Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
 
     public string ResultCommandTemplate { get; set; } = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})";
 
-    public string NotEnoughPlayersResultText { get; set; } = "Not enough players for a round.";
+    public string NotEnoughPlayersResultText { get; set; } = "/y Not enough players for a round.";
 
     public string TodSecondPairMacroText { get; set; } = "/y ♦ Time for Truth or Dare 2 ♦  Highest asks lowest, second highest asks second lowest,  \"Truth or Dare?\" Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
 
     public string TodSecondPairResultCommandTemplate { get; set; } = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})\n/y 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})";
 
-    public string TodSecondPairNotEnoughPlayersResultText { get; set; } = "2nd: Not enough players for second pair.";
+    public string TodSecondPairNotEnoughRoundPlayersResultText { get; set; } = "/y Not enough players for a !tod2 round.";
+
+    public string TodSecondPairNotEnoughPlayersResultText { get; set; } = "/y 2nd: Not enough players for second pair.";
 
     public string TodPromptChatChannel { get; set; } = "Yell";
 

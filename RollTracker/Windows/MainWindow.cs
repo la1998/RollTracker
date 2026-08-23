@@ -188,6 +188,13 @@ internal sealed class MainWindow : Window, IDisposable
             saveConfiguration();
         }
 
+        var secondPairNotEnoughRoundPlayersResultText = configuration.TodSecondPairNotEnoughRoundPlayersResultText;
+        if (ImGui.InputText("Not enough players text##Tod2", ref secondPairNotEnoughRoundPlayersResultText, 512))
+        {
+            configuration.TodSecondPairNotEnoughRoundPlayersResultText = secondPairNotEnoughRoundPlayersResultText;
+            saveConfiguration();
+        }
+
         var secondPairNotEnoughPlayersResultText = configuration.TodSecondPairNotEnoughPlayersResultText;
         if (ImGui.InputText("Not enough second pair text##Tod2", ref secondPairNotEnoughPlayersResultText, 512))
         {
@@ -442,13 +449,15 @@ internal sealed class MainWindow : Window, IDisposable
 
     private void DrawSpecialRulesTab()
     {
-        var todSpecialRulesEnabled = configuration.TodSpecialRulesEnabled;
-        if (ImGui.Checkbox("Enable ToD special rules", ref todSpecialRulesEnabled))
+        var specialRuleLineDelay = configuration.TodSpecialRuleLineDelayMilliseconds;
+        if (ImGui.InputInt("Special rule line delay (ms)", ref specialRuleLineDelay))
         {
-            configuration.TodSpecialRulesEnabled = todSpecialRulesEnabled;
+            configuration.TodSpecialRuleLineDelayMilliseconds = Math.Clamp(specialRuleLineDelay, 100, 10000);
             saveConfiguration();
         }
+        DrawHelpTooltip("Delay before and between Special Rule result lines. Leave this alone unless chat lines are skipped.");
 
+        ImGui.Separator();
         ImGui.TextWrapped("Placeholders: {player}, {roll}, {role}. Do not trigger with accepts numbers separated by commas or spaces.");
         ImGui.Separator();
 
@@ -596,6 +605,13 @@ internal sealed class MainWindow : Window, IDisposable
         if (ImGui.Checkbox("Enable ToD second pair", ref todSecondPairEnabled))
         {
             rollTrackerService.SetSecondPairEnabled(todSecondPairEnabled);
+        }
+
+        var todSpecialRulesEnabled = configuration.TodSpecialRulesEnabled;
+        if (ImGui.Checkbox("Enable ToD special rules", ref todSpecialRulesEnabled))
+        {
+            configuration.TodSpecialRulesEnabled = todSpecialRulesEnabled;
+            saveConfiguration();
         }
 
         DrawSettingsSection("Truth / Dare Suggestions");

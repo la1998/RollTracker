@@ -390,15 +390,31 @@ public sealed class Plugin : IDalamudPlugin
 
         if (string.IsNullOrWhiteSpace(Configuration.NotEnoughPlayersResultText))
         {
-            Configuration.NotEnoughPlayersResultText = "Not enough players for a round.";
+            Configuration.NotEnoughPlayersResultText = "/y Not enough players for a round.";
             changed = true;
         }
 
         if (string.IsNullOrWhiteSpace(Configuration.TodSecondPairNotEnoughPlayersResultText))
         {
-            Configuration.TodSecondPairNotEnoughPlayersResultText = "2nd: Not enough players for second pair.";
+            Configuration.TodSecondPairNotEnoughPlayersResultText = "/y 2nd: Not enough players for second pair.";
             changed = true;
         }
+
+        if (string.IsNullOrWhiteSpace(Configuration.TodSecondPairNotEnoughRoundPlayersResultText))
+        {
+            Configuration.TodSecondPairNotEnoughRoundPlayersResultText = "/y Not enough players for a !tod2 round.";
+            changed = true;
+        }
+
+        changed |= EnsureTextCommandPrefix(
+            value => Configuration.NotEnoughPlayersResultText = value,
+            Configuration.NotEnoughPlayersResultText);
+        changed |= EnsureTextCommandPrefix(
+            value => Configuration.TodSecondPairNotEnoughRoundPlayersResultText = value,
+            Configuration.TodSecondPairNotEnoughRoundPlayersResultText);
+        changed |= EnsureTextCommandPrefix(
+            value => Configuration.TodSecondPairNotEnoughPlayersResultText = value,
+            Configuration.TodSecondPairNotEnoughPlayersResultText);
 
         Configuration.TruthPrompts ??= [];
         Configuration.DarePrompts ??= [];
@@ -466,6 +482,18 @@ public sealed class Plugin : IDalamudPlugin
 
         prompts.Clear();
         prompts.AddRange(deduplicatedPrompts);
+        return true;
+    }
+
+    private static bool EnsureTextCommandPrefix(Action<string> setValue, string value)
+    {
+        var trimmedValue = value.TrimStart();
+        if (string.IsNullOrWhiteSpace(trimmedValue) || trimmedValue.StartsWith("/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        setValue($"/y {trimmedValue}");
         return true;
     }
 
