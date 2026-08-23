@@ -3,7 +3,7 @@
   "Author": "Arty",
   "Name": "RollTracker",
   "InternalName": "RollTracker",
-  "AssemblyVersion": "0.1.0.38",
+  "AssemblyVersion": "0.1.0.44",
   "TestingAssemblyVersion": "0.1.0.44",
   "TestingDalamudApiLevel": 15,
   "TestingChangelog": "Testing update: move the Special Rule line delay setting below the Special Rules editor.",
@@ -26,6 +26,6 @@
   "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.44",
   "DownloadLinkUpdate": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
   "RepoUrl": "https://github.com/la1998/RollTracker",
-  "LastUpdate": "1787492274"
+  "LastUpdate": "1787492656"
 }
 ]
