@@ -12,6 +12,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 {
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.44", "Testing update: move the Special Rule line delay setting below the Special Rules editor."),
         new("0.1.0.43", "Testing update: separate !tod2 not-enough-player fallback, visible fallback commands, and delayed Special Rule result output."),
         new("0.1.0.42", "Testing bug fix: config files now save readable Unicode symbols instead of escaped sequences."),
         new("0.1.0.41", "Testing bug fix: RollTracker now stores and reads its active config from the plugin config folder."),

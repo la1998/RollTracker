@@ -449,15 +449,6 @@ internal sealed class MainWindow : Window, IDisposable
 
     private void DrawSpecialRulesTab()
     {
-        var specialRuleLineDelay = configuration.TodSpecialRuleLineDelayMilliseconds;
-        if (ImGui.InputInt("Special rule line delay (ms)", ref specialRuleLineDelay))
-        {
-            configuration.TodSpecialRuleLineDelayMilliseconds = Math.Clamp(specialRuleLineDelay, 100, 10000);
-            saveConfiguration();
-        }
-        DrawHelpTooltip("Delay before and between Special Rule result lines. Leave this alone unless chat lines are skipped.");
-
-        ImGui.Separator();
         ImGui.TextWrapped("Placeholders: {player}, {roll}, {role}. Do not trigger with accepts numbers separated by commas or spaces.");
         ImGui.Separator();
 
@@ -539,6 +530,15 @@ internal sealed class MainWindow : Window, IDisposable
             newSpecialRuleText = string.Empty;
             saveConfiguration();
         }
+
+        ImGui.Separator();
+        var specialRuleLineDelay = configuration.TodSpecialRuleLineDelayMilliseconds;
+        if (ImGui.InputInt("Special rule line delay (ms)", ref specialRuleLineDelay))
+        {
+            configuration.TodSpecialRuleLineDelayMilliseconds = Math.Clamp(specialRuleLineDelay, 100, 10000);
+            saveConfiguration();
+        }
+        DrawHelpTooltip("Delay before and between Special Rule result lines. Leave this alone unless chat lines are skipped.");
     }
 
     private void DrawWifiTab()
