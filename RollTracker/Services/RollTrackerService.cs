@@ -1178,6 +1178,16 @@ internal sealed partial class RollTrackerService : IDisposable
             return string.Empty;
         }
 
+        const string randomPrefix = "Random!";
+        if (name.StartsWith(randomPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            name = name[randomPrefix.Length..].Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return string.Empty;
+            }
+        }
+
         var atIndex = name.IndexOf('@', StringComparison.Ordinal);
         if (atIndex > 0)
         {

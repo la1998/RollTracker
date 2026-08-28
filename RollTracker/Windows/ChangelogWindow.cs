@@ -12,6 +12,8 @@ internal sealed class ChangelogWindow : Window, IDisposable
 {
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.47", "Testing metadata bump so the testing build stays one version ahead of stable."),
+        new("0.1.0.46", "Bug fix: /random chat lines that include a leading Random! label no longer count as a second player entry."),
         new("0.1.0.44", "Stable update: adds delayed help output, separate macro delays, /rt help, config folder support, not-enough-player result texts, Truth/Dare prompt sets, Special Rule fixes, and Special Rule result delay controls."),
         new("0.1.0.43", "Testing update: separate !tod2 not-enough-player fallback, visible fallback commands, and delayed Special Rule result output."),
         new("0.1.0.42", "Testing bug fix: config files now save readable Unicode symbols instead of escaped sequences."),
