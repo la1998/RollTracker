@@ -3,10 +3,10 @@
   "Author": "Arty",
   "Name": "RollTracker",
   "InternalName": "RollTracker",
-  "AssemblyVersion": "0.1.0.46",
-  "TestingAssemblyVersion": "0.1.0.47",
+  "AssemblyVersion": "0.1.0.47",
+  "TestingAssemblyVersion": "0.1.0.48",
   "TestingDalamudApiLevel": 15,
-  "TestingChangelog": "Testing metadata bump so the testing build stays one version ahead of stable.",
+  "TestingChangelog": "UI rework with selectable layouts, themes, Roll History window, Command Help, Chat Alias, Advanced Mode, and Special Rule Sets.",
   "Description": "Reads chat messages, detects /random rolls, tracks Truth or Dare rounds, and provides configurable !truth, !dare, !help, !tod2, and !wifi helpers.\n\nCommands:\n/rt - open or close the window.\n/rt help - show the full command and trigger list locally.",
   "ApplicableVersion": "any",
   "Tags": [
@@ -23,9 +23,9 @@
   "Punchline": "Tracks /random rolls for private round games.",
   "AcceptsFeedback": false,
   "DownloadLinkInstall": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
-  "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.47",
+  "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.48",
   "DownloadLinkUpdate": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
   "RepoUrl": "https://github.com/la1998/RollTracker",
-  "LastUpdate": "1787875745"
+  "LastUpdate": "1788134073"
 }
 ]

@@ -19,21 +19,29 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool HelpTriggerEnabled { get; set; } = true;
 
+    public bool ChatAliasEnabled { get; set; }
+
     public bool WifiEnabled { get; set; } = true;
 
     public bool AutoDisableWhenLeavingHousing { get; set; } = true;
 
+    public bool AdvancedMode { get; set; }
+
     public string LastSeenChangelogVersion { get; set; } = string.Empty;
+
+    public string UiLayout { get; set; } = "Modern";
+
+    public string UiTheme { get; set; } = "Dalamud Blue";
 
     public int MacroDurationSeconds { get; set; } = 60;
 
     public int TodSecondPairMacroDurationSeconds { get; set; } = 60;
 
-    public int MacroLineDelayMilliseconds { get; set; } = 1000;
+    public int MacroLineDelayMilliseconds { get; set; } = 1500;
 
-    public int TodSecondPairMacroLineDelayMilliseconds { get; set; } = 1000;
+    public int TodSecondPairMacroLineDelayMilliseconds { get; set; } = 1500;
 
-    public int TodSpecialRuleLineDelayMilliseconds { get; set; } = 1000;
+    public int TodSpecialRuleLineDelayMilliseconds { get; set; } = 1500;
 
     public string MacroText { get; set; } = "/y ♦ Time for Truth or Dare ♦  Highest number asks the lowest number, \"Truth or Dare?\"  Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
 
@@ -53,7 +61,23 @@ public sealed class Configuration : IPluginConfiguration
 
     public string HelpChatChannel { get; set; } = "Yell";
 
+    public string ChatAliasWord { get; set; } = "alias";
+
+    public List<ChatAliasCommand> ChatAliasCommands { get; set; } = [];
+
+    public int HelpInitialDelayMilliseconds { get; set; } = 500;
+
+    public int HelpLineDelayMilliseconds { get; set; } = 1500;
+
+    public string HelpPreset { get; set; } = "Standard";
+
+    public string HelpMacroText { get; set; } = string.Empty;
+
+    public List<string> HelpLines { get; set; } = [];
+
     public List<TodSpecialRule> TodSpecialRules { get; set; } = [];
+
+    public List<TodSpecialRuleSet> TodSpecialRuleSets { get; set; } = [];
 
     public List<string> TruthPrompts { get; set; } = [];
 
@@ -65,7 +89,7 @@ public sealed class Configuration : IPluginConfiguration
 
     public string WifiChatChannel { get; set; } = "Yell";
 
-    public int WifiMacroLineDelayMilliseconds { get; set; } = 1000;
+    public int WifiMacroLineDelayMilliseconds { get; set; } = 1500;
 
     public string WifiMacroText { get; set; } = "KinkHouse Shells and Discord:\nLightless - our main sync:\nID: LLS-SWN693A68P5R  PW: KinkHausOCE\n\nPlayerSync - our optional/backup sync:\nID: MSS-6AC6326WFU4P  PW: KinkHausOCE\n\nDiscord:\nhttps://discord.gg/7N7xaghGTr";
 
@@ -76,6 +100,19 @@ public sealed class Configuration : IPluginConfiguration
             new TodSpecialRule { Roll = 0, Text = "{player} gets asked Truth and Dare." },
             new TodSpecialRule { Roll = 1, Text = "{player} gets asked Truth and Dare." },
             new TodSpecialRule { Roll = 999, Text = "{player} can ask both Truth and Dare.", DoNotTriggerWith = "0, 1" },
+        ];
+    }
+
+    public static List<string> CreateDefaultHelpLines()
+    {
+        return
+        [
+            "!help - Show currently available RollTracker chat commands.",
+            "!tod - Start a Truth or Dare roll round.",
+            "!tod2 - Start a second-pair Truth or Dare roll round.",
+            "!truth - Send a random Truth prompt.",
+            "!dare - Send a random Dare prompt.",
+            "!wifi - Show KinkHouse Shells and Discord info.",
         ];
     }
 
@@ -157,6 +194,15 @@ public sealed class TodPromptSet
     public List<string> Prompts { get; set; } = [];
 }
 
+public sealed class TodSpecialRuleSet
+{
+    public string Name { get; set; } = "Set 1";
+
+    public bool Enabled { get; set; } = true;
+
+    public List<TodSpecialRule> Rules { get; set; } = [];
+}
+
 public sealed class TodSpecialRule
 {
     public int Roll { get; set; }
@@ -164,4 +210,13 @@ public sealed class TodSpecialRule
     public string Text { get; set; } = string.Empty;
 
     public string DoNotTriggerWith { get; set; } = string.Empty;
+}
+
+public sealed class ChatAliasCommand
+{
+    public bool Enabled { get; set; } = true;
+
+    public string TriggerText { get; set; } = string.Empty;
+
+    public string RtCommandArgs { get; set; } = string.Empty;
 }

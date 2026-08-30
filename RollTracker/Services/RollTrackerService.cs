@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using Dalamud.Game.Chat;
 using Dalamud.Plugin.Services;
@@ -16,8 +17,6 @@ internal sealed partial class RollTrackerService : IDisposable
     private const string DefaultSecondPairMacroText = "/y ♦ Time for Truth or Dare 2 ♦  Highest asks lowest, second highest asks second lowest,  \"Truth or Dare?\" Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
     private const string LegacySecondPairResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll}) 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})";
     private const string DefaultSecondPairResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})\n/y 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})";
-    private const int HelpInitialDelayMilliseconds = 500;
-    private const int HelpLineDelayMilliseconds = 2000;
 
     private readonly IChatGui chatGui;
     private readonly ICommandManager commandManager;
@@ -388,12 +387,24 @@ internal sealed partial class RollTrackerService : IDisposable
 
     private List<string> BuildSpecialRuleTextsForRoll(RollEntry roll, string role, IReadOnlyCollection<int> roundRolls)
     {
-        return configuration.TodSpecialRules
+        return GetActiveSpecialRules()
             .Where(rule => rule.Roll == roll.Value)
             .Where(rule => !ShouldSkipSpecialRule(rule, roundRolls))
             .Select(rule => BuildSpecialRuleText(rule, roll, role))
             .Where(text => !string.IsNullOrWhiteSpace(text))
             .ToList();
+    }
+
+    private IEnumerable<TodSpecialRule> GetActiveSpecialRules()
+    {
+        if (configuration.TodSpecialRuleSets.Count == 0)
+        {
+            return configuration.TodSpecialRules;
+        }
+
+        return configuration.TodSpecialRuleSets
+            .Where(ruleSet => ruleSet.Enabled)
+            .SelectMany(ruleSet => ruleSet.Rules ?? []);
     }
 
     private string GetRollRole(RollEntry roll)
@@ -532,6 +543,7 @@ internal sealed partial class RollTrackerService : IDisposable
         configuration.TruthTriggerEnabled = enabled;
         configuration.DareTriggerEnabled = enabled;
         configuration.HelpTriggerEnabled = enabled;
+        configuration.ChatAliasEnabled = enabled;
         configuration.TodSpecialRulesEnabled = enabled;
         configuration.TodSecondPairEnabled = enabled;
         configuration.WifiEnabled = enabled;
@@ -585,6 +597,13 @@ internal sealed partial class RollTrackerService : IDisposable
         }
 
         chatGui.Print($"RollTracker !help {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+    }
+
+    public void SetChatAliasEnabled(bool enabled)
+    {
+        configuration.ChatAliasEnabled = enabled;
+        saveConfiguration();
+        chatGui.Print($"RollTracker chat alias {(enabled ? "enabled" : "disabled")}.", "RollTracker");
     }
 
     public void SetSecondPairEnabled(bool enabled)
@@ -693,6 +712,11 @@ internal sealed partial class RollTrackerService : IDisposable
     {
         var sender = chatMessage.Sender.TextValue.Trim();
         var message = chatMessage.Message.TextValue.Trim();
+
+        if (TryHandleChatAlias(sender, message))
+        {
+            return;
+        }
 
         if (configuration.HelpTriggerEnabled && IsHelpTrigger(message))
         {
@@ -853,6 +877,7 @@ internal sealed partial class RollTrackerService : IDisposable
              configuration.TruthTriggerEnabled ||
              configuration.DareTriggerEnabled ||
              configuration.HelpTriggerEnabled ||
+             configuration.ChatAliasEnabled ||
              configuration.WifiEnabled) &&
             wasInHousingInterior &&
             !isInHousingInterior)
@@ -861,6 +886,7 @@ internal sealed partial class RollTrackerService : IDisposable
             configuration.TruthTriggerEnabled = false;
             configuration.DareTriggerEnabled = false;
             configuration.HelpTriggerEnabled = false;
+            configuration.ChatAliasEnabled = false;
             configuration.TodSecondPairEnabled = false;
             configuration.WifiEnabled = false;
             roundEndsAt = null;
@@ -954,7 +980,7 @@ internal sealed partial class RollTrackerService : IDisposable
 
     private static int ClampMacroLineDelay(int delayMilliseconds)
     {
-        return Math.Clamp(delayMilliseconds <= 0 ? 1000 : delayMilliseconds, 100, 10000);
+        return Math.Clamp(delayMilliseconds <= 0 ? 1500 : delayMilliseconds, 100, 10000);
     }
 
     private void ExecuteNextTodPromptCommand()
@@ -1067,45 +1093,319 @@ internal sealed partial class RollTrackerService : IDisposable
             pendingTodPromptCommands.Enqueue(new DelayedCommand(
                 $"{chatCommand} {helpLines[i]}",
                 "Help",
-                DateTimeOffset.Now.AddMilliseconds(HelpInitialDelayMilliseconds + (i * HelpLineDelayMilliseconds))));
+                DateTimeOffset.Now.AddMilliseconds(
+                    Math.Clamp(configuration.HelpInitialDelayMilliseconds, 0, 10000) +
+                    (i * ClampMacroLineDelay(configuration.HelpLineDelayMilliseconds)))));
         }
+    }
+
+    private bool TryHandleChatAlias(string sender, string message)
+    {
+        if (!configuration.ChatAliasEnabled ||
+            string.IsNullOrWhiteSpace(configuration.ChatAliasWord) ||
+            configuration.ChatAliasCommands.Count == 0)
+        {
+            return false;
+        }
+
+        var aliasWord = configuration.ChatAliasWord.Trim();
+        if (!message.StartsWith(aliasWord, StringComparison.OrdinalIgnoreCase) ||
+            message.Length <= aliasWord.Length ||
+            !char.IsWhiteSpace(message[aliasWord.Length]))
+        {
+            return false;
+        }
+
+        var requestedAlias = message[aliasWord.Length..].Trim();
+        var aliasCommand = configuration.ChatAliasCommands.FirstOrDefault(command =>
+            command.Enabled &&
+            command.TriggerText.Equals(requestedAlias, StringComparison.OrdinalIgnoreCase));
+        if (aliasCommand is null)
+        {
+            return false;
+        }
+
+        ExecuteChatAliasCommand(aliasCommand.RtCommandArgs, string.IsNullOrWhiteSpace(sender) ? "Unknown" : sender);
+        return true;
+    }
+
+    private void ExecuteChatAliasCommand(string args, string sender)
+    {
+        var normalizedArgs = args.Trim();
+        chatGui.Print($"Chat alias from {sender}: /rt {normalizedArgs}", "RollTracker");
+
+        if (TryExecuteModuleToggle(normalizedArgs, true) ||
+            TryExecuteModuleToggle(normalizedArgs, false) ||
+            TryExecuteReversedModuleToggle(normalizedArgs))
+        {
+            return;
+        }
+
+        if (normalizedArgs.Equals("reset", StringComparison.OrdinalIgnoreCase) ||
+            normalizedArgs.Equals("clear", StringComparison.OrdinalIgnoreCase))
+        {
+            Reset();
+            chatGui.Print("Roll list reset.", "RollTracker");
+            return;
+        }
+
+        if (normalizedArgs.Equals("end", StringComparison.OrdinalIgnoreCase))
+        {
+            FinishRoundAndReset();
+            return;
+        }
+
+        if (normalizedArgs.Equals("test", StringComparison.OrdinalIgnoreCase))
+        {
+            AddTestRolls();
+        }
+    }
+
+    private bool TryExecuteModuleToggle(string args, bool enabled)
+    {
+        var command = enabled ? "on" : "off";
+        if (!args.StartsWith(command, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var target = args[command.Length..].Trim();
+        if (target.Length == 0 || target.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            SetAllModulesEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("tod", StringComparison.OrdinalIgnoreCase))
+        {
+            SetEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("todrules", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("tod rules", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("special", StringComparison.OrdinalIgnoreCase))
+        {
+            configuration.TodSpecialRulesEnabled = enabled;
+            saveConfiguration();
+            chatGui.Print($"RollTracker ToD special rules {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+            return true;
+        }
+
+        if (target.Equals("todsecond", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("tod second", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("second", StringComparison.OrdinalIgnoreCase))
+        {
+            SetSecondPairEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("truth", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!truth", StringComparison.OrdinalIgnoreCase))
+        {
+            SetTruthTriggerEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("dare", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!dare", StringComparison.OrdinalIgnoreCase))
+        {
+            SetDareTriggerEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("help", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!help", StringComparison.OrdinalIgnoreCase))
+        {
+            SetHelpTriggerEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("alias", StringComparison.OrdinalIgnoreCase))
+        {
+            SetChatAliasEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("wifi", StringComparison.OrdinalIgnoreCase))
+        {
+            SetWifiEnabled(enabled);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryExecuteReversedModuleToggle(string args)
+    {
+        var parts = args.Split(' ', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2)
+        {
+            return false;
+        }
+
+        if (parts[1].Equals("on", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryExecuteModuleToggle($"on {parts[0]}", true);
+        }
+
+        if (parts[1].Equals("off", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryExecuteModuleToggle($"off {parts[0]}", false);
+        }
+
+        return false;
     }
 
     private List<string> BuildHelpLines()
     {
-        var helpLines = new List<string>();
-
-        if (configuration.HelpTriggerEnabled)
+        return configuration.HelpPreset switch
         {
-            helpLines.Add("!help - Show currently available RollTracker chat commands.");
+            "Compact" =>
+            [
+                $"Commands: {string.Join("; ", GetHelpCommandInfos().Select(command => $"{command.Command} ({(command.Enabled ? "On" : "Off")})"))}",
+            ],
+            "Macro Mode" when configuration.AdvancedMode => BuildMacroHelpLines(),
+            _ => (configuration.HelpLines ?? Configuration.CreateDefaultHelpLines())
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .Select(line => line.Trim())
+                .Where(IsHelpLineAvailable)
+                .ToList(),
+        };
+    }
+
+    private List<string> BuildMacroHelpLines()
+    {
+        var macroText = configuration.HelpMacroText ?? string.Empty;
+
+        return macroText
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(ApplyHelpMacroPlaceholders)
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Select(line => line!.Trim())
+            .Where(IsHelpLineAvailable)
+            .ToList();
+    }
+
+    private string? ApplyHelpMacroPlaceholders(string line)
+    {
+        line = ApplyHelpMacroSegmentFilters(line);
+
+        return line
+            .Replace("{activeCommands}", string.Join(", ", GetHelpCommandInfos().Where(command => command.Enabled).Select(command => command.Command)), StringComparison.OrdinalIgnoreCase)
+            .Replace("{commandStates}", string.Join("; ", GetHelpCommandInfos().Select(command => $"{command.Command} ({(command.Enabled ? "On" : "Off")})")), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string ApplyHelpMacroSegmentFilters(string line)
+    {
+        var output = new StringBuilder();
+        var index = 0;
+
+        while (index < line.Length)
+        {
+            var nextGate = FindNextHelpMacroGate(line, index);
+            if (nextGate is null)
+            {
+                output.Append(line[index..]);
+                break;
+            }
+
+            if (nextGate.Value.Index > index)
+            {
+                output.Append(line[index..nextGate.Value.Index]);
+            }
+
+            var segmentStart = nextGate.Value.Index + nextGate.Value.Token.Length;
+            var followingGate = FindNextHelpMacroGate(line, segmentStart);
+            var segmentEnd = followingGate?.Index ?? line.Length;
+
+            if (nextGate.Value.Command.Enabled)
+            {
+                output.Append(line[segmentStart..segmentEnd]);
+            }
+
+            index = segmentEnd;
         }
 
-        if (configuration.Enabled)
+        return output.ToString();
+    }
+
+    private (int Index, string Token, HelpCommandInfo Command)? FindNextHelpMacroGate(string line, int startIndex)
+    {
+        (int Index, string Token, HelpCommandInfo Command)? nextGate = null;
+        foreach (var command in GetHelpCommandInfos())
         {
-            helpLines.Add("!tod - Start a Truth or Dare roll round.");
+            var token = $"{{{command.Command}}}";
+            var index = line.IndexOf(token, startIndex, StringComparison.OrdinalIgnoreCase);
+            if (index < 0 || (nextGate is not null && index >= nextGate.Value.Index))
+            {
+                continue;
+            }
+
+            nextGate = (index, token, command);
         }
 
-        if (configuration.TodSecondPairEnabled)
+        return nextGate;
+    }
+
+    private List<HelpCommandInfo> GetHelpCommandInfos()
+    {
+        return
+        [
+            new("!help", configuration.HelpTriggerEnabled),
+            new("!tod", configuration.Enabled),
+            new("!tod2", configuration.TodSecondPairEnabled),
+            new("!truth", configuration.TruthTriggerEnabled),
+            new("!dare", configuration.DareTriggerEnabled),
+            new("!wifi", configuration.WifiEnabled),
+        ];
+    }
+
+    private bool IsHelpLineAvailable(string helpLine)
+    {
+        if (StartsWithHelpCommand(helpLine, "!help"))
         {
-            helpLines.Add("!tod2 - Start a second-pair Truth or Dare roll round.");
+            return configuration.HelpTriggerEnabled;
         }
 
-        if (configuration.TruthTriggerEnabled)
+        if (StartsWithHelpCommand(helpLine, "!tod2"))
         {
-            helpLines.Add("!truth - Send a random Truth prompt.");
+            return configuration.TodSecondPairEnabled;
         }
 
-        if (configuration.DareTriggerEnabled)
+        if (StartsWithHelpCommand(helpLine, "!tod"))
         {
-            helpLines.Add("!dare - Send a random Dare prompt.");
+            return configuration.Enabled;
         }
 
-        if (configuration.WifiEnabled)
+        if (StartsWithHelpCommand(helpLine, "!truth"))
         {
-            helpLines.Add("!wifi - Show KinkHouse Shells and Discord info.");
+            return configuration.TruthTriggerEnabled;
         }
 
-        return helpLines;
+        if (StartsWithHelpCommand(helpLine, "!dare"))
+        {
+            return configuration.DareTriggerEnabled;
+        }
+
+        if (StartsWithHelpCommand(helpLine, "!wifi"))
+        {
+            return configuration.WifiEnabled;
+        }
+
+        return true;
+    }
+
+    private static bool StartsWithHelpCommand(string helpLine, string command)
+    {
+        if (!helpLine.StartsWith(command, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return helpLine.Length == command.Length ||
+               char.IsWhiteSpace(helpLine[command.Length]) ||
+               helpLine[command.Length] is '-' or ':' or '=';
     }
 
     private static bool IsRoundEndMarker(string message)
@@ -1295,6 +1595,8 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly record struct DelayedCommand(string Command, string PromptType, DateTimeOffset ExecuteAt);
 
     private readonly record struct RoundResultCommand(string Command, bool IsSpecialRule);
+
+    private readonly record struct HelpCommandInfo(string Command, bool Enabled);
 
     private enum RoundKind
     {

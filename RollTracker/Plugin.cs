@@ -42,6 +42,8 @@ public sealed class Plugin : IDalamudPlugin
         "/rt off dare - disable !dare.",
         "/rt on help - enable !help.",
         "/rt off help - disable !help.",
+        "/rt on alias - enable chat alias.",
+        "/rt off alias - disable chat alias.",
         "/rt on wifi - enable !wifi.",
         "/rt off wifi - disable !wifi.",
         "/rt status - show module states.",
@@ -81,6 +83,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private MainWindow MainWindow { get; }
 
+    private RollHistoryWindow RollHistoryWindow { get; }
+
     private ChangelogWindow ChangelogWindow { get; }
 
     public Plugin()
@@ -96,10 +100,19 @@ public sealed class Plugin : IDalamudPlugin
             Log,
             Configuration,
             SaveConfiguration);
-        MainWindow = new MainWindow(RollTrackerService, Configuration, PluginInterface, ChatGui, SaveConfiguration);
+        RollHistoryWindow = new RollHistoryWindow(RollTrackerService);
         ChangelogWindow = new ChangelogWindow(Configuration, SaveConfiguration, GetPluginVersion());
+        MainWindow = new MainWindow(
+            RollTrackerService,
+            Configuration,
+            PluginInterface,
+            ChatGui,
+            SaveConfiguration,
+            () => RollHistoryWindow.IsOpen = true,
+            () => ChangelogWindow.IsOpen = true);
 
         WindowSystem.AddWindow(MainWindow);
+        WindowSystem.AddWindow(RollHistoryWindow);
         WindowSystem.AddWindow(ChangelogWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -127,6 +140,7 @@ public sealed class Plugin : IDalamudPlugin
 
         WindowSystem.RemoveAllWindows();
         MainWindow.Dispose();
+        RollHistoryWindow.Dispose();
         ChangelogWindow.Dispose();
         RollTrackerService.Dispose();
     }
@@ -166,7 +180,7 @@ public sealed class Plugin : IDalamudPlugin
 
         if (trimmedArgs.Equals("status", StringComparison.OrdinalIgnoreCase))
         {
-            ChatGui.Print($"RollTracker ToD is {(Configuration.Enabled ? "on" : "off")}; !truth is {(Configuration.TruthTriggerEnabled ? "on" : "off")}; !dare is {(Configuration.DareTriggerEnabled ? "on" : "off")}; !help is {(Configuration.HelpTriggerEnabled ? "on" : "off")}; ToD special rules are {(Configuration.TodSpecialRulesEnabled ? "on" : "off")}; !tod2 is {(Configuration.TodSecondPairEnabled ? "on" : "off")}; !wifi is {(Configuration.WifiEnabled ? "on" : "off")}.", "RollTracker");
+            ChatGui.Print($"RollTracker ToD is {(Configuration.Enabled ? "on" : "off")}; !truth is {(Configuration.TruthTriggerEnabled ? "on" : "off")}; !dare is {(Configuration.DareTriggerEnabled ? "on" : "off")}; !help is {(Configuration.HelpTriggerEnabled ? "on" : "off")}; chat alias is {(Configuration.ChatAliasEnabled ? "on" : "off")}; ToD special rules are {(Configuration.TodSpecialRulesEnabled ? "on" : "off")}; !tod2 is {(Configuration.TodSecondPairEnabled ? "on" : "off")}; !wifi is {(Configuration.WifiEnabled ? "on" : "off")}.", "RollTracker");
             return;
         }
 
@@ -258,6 +272,13 @@ public sealed class Plugin : IDalamudPlugin
             target.Equals("!help", StringComparison.OrdinalIgnoreCase))
         {
             RollTrackerService.SetHelpTriggerEnabled(enabled);
+            return true;
+        }
+
+        if (target.Equals("alias", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("chat alias", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetChatAliasEnabled(enabled);
             return true;
         }
 
@@ -406,6 +427,64 @@ public sealed class Plugin : IDalamudPlugin
             changed = true;
         }
 
+        if (Configuration.HelpInitialDelayMilliseconds <= 0)
+        {
+            Configuration.HelpInitialDelayMilliseconds = 500;
+            changed = true;
+        }
+
+        Configuration.HelpLines ??= [];
+        if (Configuration.HelpLines.Count == 0)
+        {
+            Configuration.HelpLines.AddRange(Configuration.CreateDefaultHelpLines());
+            changed = true;
+        }
+
+        changed |= RemoveDuplicatePrompts(Configuration.HelpLines);
+
+        if (string.IsNullOrWhiteSpace(Configuration.ChatAliasWord))
+        {
+            Configuration.ChatAliasWord = "alias";
+            changed = true;
+        }
+
+        Configuration.ChatAliasCommands ??= [];
+        for (var i = Configuration.ChatAliasCommands.Count - 1; i >= 0; i--)
+        {
+            var aliasCommand = Configuration.ChatAliasCommands[i];
+            aliasCommand.TriggerText = aliasCommand.TriggerText.Trim();
+            aliasCommand.RtCommandArgs = aliasCommand.RtCommandArgs.Trim();
+            if (string.IsNullOrWhiteSpace(aliasCommand.TriggerText) ||
+                string.IsNullOrWhiteSpace(aliasCommand.RtCommandArgs))
+            {
+                Configuration.ChatAliasCommands.RemoveAt(i);
+                changed = true;
+                continue;
+            }
+
+            Configuration.ChatAliasCommands[i] = aliasCommand;
+        }
+
+        if (string.IsNullOrWhiteSpace(Configuration.HelpPreset))
+        {
+            Configuration.HelpPreset = "Standard";
+            changed = true;
+        }
+
+        if (!Configuration.HelpPreset.Equals("Standard", StringComparison.Ordinal) &&
+            !Configuration.HelpPreset.Equals("Compact", StringComparison.Ordinal) &&
+            !Configuration.HelpPreset.Equals("Macro Mode", StringComparison.Ordinal))
+        {
+            Configuration.HelpPreset = "Standard";
+            changed = true;
+        }
+
+        if (Configuration.HelpMacroText.Equals("Commands: {activeCommands}", StringComparison.Ordinal))
+        {
+            Configuration.HelpMacroText = string.Empty;
+            changed = true;
+        }
+
         changed |= EnsureTextCommandPrefix(
             value => Configuration.NotEnoughPlayersResultText = value,
             Configuration.NotEnoughPlayersResultText);
@@ -431,24 +510,16 @@ public sealed class Plugin : IDalamudPlugin
             changed = true;
         }
 
-        changed |= RemoveDuplicateSpecialRules();
-
         if (Configuration.TodSpecialRules.Count == 0)
         {
             Configuration.TodSpecialRules.AddRange(Configuration.CreateDefaultTodSpecialRules());
             changed = true;
         }
 
-        foreach (var rule in Configuration.TodSpecialRules)
-        {
-            if (rule.Roll == 999 &&
-                string.IsNullOrWhiteSpace(rule.DoNotTriggerWith) &&
-                rule.Text.Equals("{player} can ask both Truth and Dare.", StringComparison.Ordinal))
-            {
-                rule.DoNotTriggerWith = "0, 1";
-                changed = true;
-            }
-        }
+        changed |= RemoveDuplicateSpecialRules(Configuration.TodSpecialRules);
+        changed |= EnsureDefaultSpecialRuleBlockers(Configuration.TodSpecialRules);
+        Configuration.TodSpecialRuleSets ??= [];
+        changed |= MigrateSpecialRuleSets(Configuration.TodSpecialRuleSets, Configuration.TodSpecialRules);
 
         if (changed)
         {
@@ -532,33 +603,83 @@ public sealed class Plugin : IDalamudPlugin
         return changed;
     }
 
-    private bool RemoveDuplicateSpecialRules()
+    private static bool MigrateSpecialRuleSets(List<TodSpecialRuleSet> specialRuleSets, List<TodSpecialRule> legacyRules)
     {
         var changed = false;
-        for (var i = Configuration.TodSpecialRules.Count - 1; i >= 0; i--)
+
+        if (specialRuleSets.Count == 0)
         {
-            var currentRule = Configuration.TodSpecialRules[i];
+            specialRuleSets.Add(new TodSpecialRuleSet
+            {
+                Name = "Set 1",
+                Enabled = true,
+                Rules = [.. legacyRules],
+            });
+            changed = true;
+        }
+
+        for (var i = 0; i < specialRuleSets.Count; i++)
+        {
+            var ruleSet = specialRuleSets[i];
+            if (string.IsNullOrWhiteSpace(ruleSet.Name))
+            {
+                ruleSet.Name = $"Set {i + 1}";
+                changed = true;
+            }
+
+            ruleSet.Rules ??= [];
+            changed |= RemoveDuplicateSpecialRules(ruleSet.Rules);
+            changed |= EnsureDefaultSpecialRuleBlockers(ruleSet.Rules);
+            specialRuleSets[i] = ruleSet;
+        }
+
+        return changed;
+    }
+
+    private static bool EnsureDefaultSpecialRuleBlockers(List<TodSpecialRule> rules)
+    {
+        var changed = false;
+        foreach (var rule in rules)
+        {
+            if (rule.Roll == 999 &&
+                string.IsNullOrWhiteSpace(rule.DoNotTriggerWith) &&
+                rule.Text.Equals("{player} can ask both Truth and Dare.", StringComparison.Ordinal))
+            {
+                rule.DoNotTriggerWith = "0, 1";
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    private static bool RemoveDuplicateSpecialRules(List<TodSpecialRule> rules)
+    {
+        var changed = false;
+        for (var i = rules.Count - 1; i >= 0; i--)
+        {
+            var currentRule = rules[i];
             currentRule.Text = currentRule.Text.Trim();
             currentRule.DoNotTriggerWith = MergeRollLists(currentRule.DoNotTriggerWith);
-            if (!currentRule.Text.Equals(Configuration.TodSpecialRules[i].Text, StringComparison.Ordinal) ||
-                !currentRule.DoNotTriggerWith.Equals(Configuration.TodSpecialRules[i].DoNotTriggerWith, StringComparison.Ordinal))
+            if (!currentRule.Text.Equals(rules[i].Text, StringComparison.Ordinal) ||
+                !currentRule.DoNotTriggerWith.Equals(rules[i].DoNotTriggerWith, StringComparison.Ordinal))
             {
                 changed = true;
             }
 
-            var duplicateIndex = Configuration.TodSpecialRules.FindIndex(0, i, rule =>
+            var duplicateIndex = rules.FindIndex(0, i, rule =>
                 rule.Roll == currentRule.Roll &&
                 rule.Text.Trim().Equals(currentRule.Text, StringComparison.Ordinal));
             if (duplicateIndex < 0)
             {
-                Configuration.TodSpecialRules[i] = currentRule;
+                rules[i] = currentRule;
                 continue;
             }
 
-            Configuration.TodSpecialRules[duplicateIndex].DoNotTriggerWith = MergeRollLists(
-                Configuration.TodSpecialRules[duplicateIndex].DoNotTriggerWith,
+            rules[duplicateIndex].DoNotTriggerWith = MergeRollLists(
+                rules[duplicateIndex].DoNotTriggerWith,
                 currentRule.DoNotTriggerWith);
-            Configuration.TodSpecialRules.RemoveAt(i);
+            rules.RemoveAt(i);
             changed = true;
         }
 

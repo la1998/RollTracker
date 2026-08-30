@@ -10,9 +10,14 @@ namespace RollTracker.Windows;
 
 internal sealed class ChangelogWindow : Window, IDisposable
 {
+    private static readonly Vector4 AccentColor = new(0.42f, 0.72f, 1.00f, 1.00f);
+    private static readonly Vector4 SuccessColor = new(0.46f, 0.86f, 0.58f, 1.00f);
+    private static readonly Vector4 PanelColor = new(0.08f, 0.10f, 0.11f, 0.92f);
+
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
-        new("0.1.0.47", "Testing metadata bump so the testing build stays one version ahead of stable."),
+        new("0.1.0.48", "Testing update: UI rework with selectable layouts, themes, Roll History window, Command Help, Chat Alias, Advanced Mode, and Special Rule Sets."),
+        new("0.1.0.47", "Stable metadata bump so stable keeps the Random! duplicate roll fix while testing stays one version ahead."),
         new("0.1.0.46", "Bug fix: /random chat lines that include a leading Random! label no longer count as a second player entry."),
         new("0.1.0.44", "Stable update: adds delayed help output, separate macro delays, /rt help, config folder support, not-enough-player result texts, Truth/Dare prompt sets, Special Rule fixes, and Special Rule result delay controls."),
         new("0.1.0.43", "Testing update: separate !tod2 not-enough-player fallback, visible fallback commands, and delayed Special Rule result output."),
@@ -46,11 +51,11 @@ internal sealed class ChangelogWindow : Window, IDisposable
         this.currentVersion = currentVersion;
 
         IsOpen = ShouldOpen();
-        Flags = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize;
+        Flags = ImGuiWindowFlags.None;
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(360, 180),
-            MaximumSize = new Vector2(560, 640),
+            MinimumSize = new Vector2(560, 430),
+            MaximumSize = new Vector2(760, 760),
         };
     }
 
@@ -60,29 +65,105 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     public override void Draw()
     {
-        ImGui.TextUnformatted($"RollTracker updated to {currentVersion}");
-        ImGui.Separator();
+        PushStyle();
+        try
+        {
+            ImGui.TextColored(AccentColor, "RollTracker Changelog");
+            ImGui.TextDisabled($"Updated to {currentVersion}");
+            ImGui.Separator();
+            DrawNavigationStrip();
 
+            ImGui.Spacing();
+            ImGui.TextColored(AccentColor, $"RollTracker {currentVersion}");
+            ImGui.TextDisabled("Recent plugin changes and fixes");
+            ImGui.Separator();
+
+            var footerHeight = 38 * ImGuiHelpers.GlobalScale;
+            if (ImGui.BeginChild("##RollTrackerChangelogEntries", new Vector2(0, Math.Max(160 * ImGuiHelpers.GlobalScale, ImGui.GetContentRegionAvail().Y - footerHeight)), true))
+            {
+                DrawEntries();
+            }
+            ImGui.EndChild();
+
+            ImGui.Spacing();
+            DrawFooter();
+        }
+        finally
+        {
+            PopStyle();
+        }
+    }
+
+    private static void DrawNavigationStrip()
+    {
+        ImGui.PushStyleColor(ImGuiCol.ChildBg, PanelColor);
+        if (ImGui.BeginChild("##RollTrackerChangelogStrip", new Vector2(0, 32 * ImGuiHelpers.GlobalScale), true))
+        {
+            var text = "Changelog";
+            var textWidth = ImGui.CalcTextSize(text).X;
+            ImGui.SetCursorPosX(Math.Max(0, (ImGui.GetContentRegionAvail().X - textWidth) * 0.5f));
+            ImGui.TextColored(AccentColor, text);
+        }
+        ImGui.EndChild();
+        ImGui.PopStyleColor();
+    }
+
+    private void DrawEntries()
+    {
         var visibleEntries = GetVisibleEntries().ToList();
         if (visibleEntries.Count == 0)
         {
             ImGui.TextWrapped("No detailed changelog entries are available for this version.");
-        }
-        else
-        {
-            foreach (var entry in visibleEntries)
-            {
-                ImGui.TextUnformatted(entry.Version);
-                ImGui.SameLine();
-                ImGui.TextWrapped(entry.Text);
-            }
+            return;
         }
 
+        foreach (var entry in visibleEntries)
+        {
+            DrawEntry(entry);
+        }
+    }
+
+    private static void DrawEntry(ChangelogEntry entry)
+    {
+        ImGui.TextColored(SuccessColor, entry.Version);
+        ImGui.SameLine();
+        ImGui.TextDisabled("RollTracker update");
         ImGui.Spacing();
-        if (ImGui.Button("Got it", new Vector2(110 * ImGuiHelpers.GlobalScale, 0)))
+        ImGui.Bullet();
+        ImGui.SameLine();
+        ImGui.TextWrapped(entry.Text);
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+    }
+
+    private void DrawFooter()
+    {
+        var buttonWidth = 130 * ImGuiHelpers.GlobalScale;
+        ImGui.SetCursorPosX(Math.Max(0, (ImGui.GetContentRegionAvail().X - buttonWidth) * 0.5f));
+        if (ImGui.Button("Close", new Vector2(buttonWidth, 0)))
         {
             MarkSeenAndClose();
         }
+    }
+
+    private static void PushStyle()
+    {
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(8, 8) * ImGuiHelpers.GlobalScale);
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 3 * ImGuiHelpers.GlobalScale);
+        ImGui.PushStyleVar(ImGuiStyleVar.ChildRounding, 4 * ImGuiHelpers.GlobalScale);
+        ImGui.PushStyleColor(ImGuiCol.WindowBg, new Vector4(0.06f, 0.08f, 0.09f, 0.98f));
+        ImGui.PushStyleColor(ImGuiCol.ChildBg, PanelColor);
+        ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.22f, 0.26f, 0.30f, 0.90f));
+        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.12f, 0.28f, 0.48f, 1.00f));
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.17f, 0.38f, 0.64f, 1.00f));
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.08f, 0.22f, 0.40f, 1.00f));
+    }
+
+    private static void PopStyle()
+    {
+        ImGui.PopStyleColor(6);
+        ImGui.PopStyleVar(3);
     }
 
     private bool ShouldOpen()
