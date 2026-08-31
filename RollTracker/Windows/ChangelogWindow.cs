@@ -16,6 +16,14 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.51", """
+            Testing fixes
+            - Standard is now the default UI layout for new installs and migrated testing configs.
+            - The Truth or Dare tab now shows the normal ToD Not enough players text in Modern and Standard layouts.
+            - The Truth or Dare tab now shows both Double ToD fallback fields in Modern and Standard layouts:
+              - Not enough players text
+              - Not enough second pair text
+            """),
         new("0.1.0.50", """
             Highlights
             - Added a full UI rework with selectable layouts.

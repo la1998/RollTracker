@@ -29,7 +29,7 @@ public sealed class Configuration : IPluginConfiguration
 
     public string LastSeenChangelogVersion { get; set; } = string.Empty;
 
-    public string UiLayout { get; set; } = "Modern";
+    public string UiLayout { get; set; } = "Standard";
 
     public string UiTheme { get; set; } = "Dalamud Blue";
 

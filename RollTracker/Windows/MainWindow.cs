@@ -26,8 +26,8 @@ internal sealed class MainWindow : Window, IDisposable
 
     private static readonly string[] UiLayoutNames =
     [
-        "Modern",
         "Standard",
+        "Modern",
         "Legacy",
     ];
 
@@ -494,6 +494,14 @@ internal sealed class MainWindow : Window, IDisposable
             saveConfiguration();
         }
 
+        var notEnoughPlayersResultText = configuration.NotEnoughPlayersResultText;
+        ImGui.SetNextItemWidth(-1);
+        if (ImGui.InputText("Not enough players text##TodQuick", ref notEnoughPlayersResultText, 512))
+        {
+            configuration.NotEnoughPlayersResultText = notEnoughPlayersResultText;
+            saveConfiguration();
+        }
+
         if (ImGui.Button("Run !tod Now", new Vector2(-1, 0)))
         {
             rollTrackerService.StartRoundFromTrigger("manual");
@@ -523,6 +531,22 @@ internal sealed class MainWindow : Window, IDisposable
         if (ImGui.InputTextMultiline("!tod2 result##Tod2Result", ref secondResultCommand, 1024, new Vector2(0, 46 * ImGuiHelpers.GlobalScale)))
         {
             configuration.TodSecondPairResultCommandTemplate = secondResultCommand;
+            saveConfiguration();
+        }
+
+        var notEnoughRoundPlayersResultText = configuration.TodSecondPairNotEnoughRoundPlayersResultText;
+        ImGui.SetNextItemWidth(-1);
+        if (ImGui.InputText("Not enough players text##Tod2Quick", ref notEnoughRoundPlayersResultText, 512))
+        {
+            configuration.TodSecondPairNotEnoughRoundPlayersResultText = notEnoughRoundPlayersResultText;
+            saveConfiguration();
+        }
+
+        var notEnoughSecondPairText = configuration.TodSecondPairNotEnoughPlayersResultText;
+        ImGui.SetNextItemWidth(-1);
+        if (ImGui.InputText("Not enough second pair text##Tod2Quick", ref notEnoughSecondPairText, 512))
+        {
+            configuration.TodSecondPairNotEnoughPlayersResultText = notEnoughSecondPairText;
             saveConfiguration();
         }
 

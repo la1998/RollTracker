@@ -485,6 +485,13 @@ public sealed class Plugin : IDalamudPlugin
             changed = true;
         }
 
+        if (string.IsNullOrWhiteSpace(Configuration.UiLayout) ||
+            Configuration.UiLayout.Equals("Modern", StringComparison.Ordinal))
+        {
+            Configuration.UiLayout = "Standard";
+            changed = true;
+        }
+
         changed |= EnsureTextCommandPrefix(
             value => Configuration.NotEnoughPlayersResultText = value,
             Configuration.NotEnoughPlayersResultText);
