@@ -16,6 +16,159 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.50", """
+            Highlights
+            - Added a full UI rework with selectable layouts.
+            - Added selectable color themes for all layouts.
+            - Added a new Advanced Mode for risky or technical settings.
+            - Added separate Roll History, Command Help, Chat Alias, and Changelog windows/tabs.
+            - Added set management for Truth prompts, Dare prompts, and Special Rules.
+
+            UI Layouts
+            - Added a UI layout dropdown with three modes:
+              - Modern
+              - Standard
+              - Legacy
+            - Modern uses a left sidebar navigation.
+            - Standard keeps the classic top tab navigation.
+            - Legacy keeps an original-style layout while still supporting the newer theme system.
+            - Renamed Truth / Dare to ToD Suggestions.
+            - Renamed !wifi to Shell Infos.
+            - Added Command Help as its own module tab.
+            - Added Chat Alias as its own module tab.
+
+            Themes
+            - Added a UI theme dropdown.
+            - Added multiple themes:
+              - Dalamud Blue
+              - Dalamud Night
+              - Emerald
+              - Graphite
+            - Legacy mode now also uses the selected theme colors.
+
+            Truth Or Dare Round UI
+            - Reworked the main Truth or Dare controls for better spacing and readability.
+            - Renamed round sections:
+              - Normal ToD Round
+              - Double ToD Round
+            - Moved Roll History out of the main Truth or Dare page for Modern and Standard layouts.
+            - Added Open Roll History in the Round Info panel.
+            - Made the Round Info panel narrower so the main controls have more room.
+            - Added the Reset rolls and End round and post result actions to the Roll History window too.
+
+            Roll History Window
+            - Added a separate Roll History window.
+            - The Roll History window shows:
+              - current roll count
+              - highest roll
+              - lowest roll
+              - full roll table
+            - Added high/low roll color feedback.
+            - Added direct actions:
+              - Reset rolls
+              - End round and post result
+
+            ToD Suggestions
+            - Added a Sets Manager for Truth and Dare prompt sets.
+            - Prompt sets can be enabled or disabled from the Sets Manager by clicking the set name.
+            - Added visual feedback for enabled and disabled sets.
+            - Removed the per-set enabled checkbox from the edit area where the Sets Manager now handles that state.
+            - Legacy mode also has a compact Sets Manager for Truth and Dare sets.
+
+            Special Rules
+            - Added Special Rule Sets.
+            - Existing special rules are migrated into Set 1.
+            - Special Rule Sets can be:
+              - created
+              - duplicated
+              - renamed
+              - deleted
+              - enabled or disabled
+            - Only enabled Special Rule Sets are checked when roll results are posted.
+            - Added a Special Rules Sets Manager in Modern, Standard, and Legacy layouts.
+            - Removed the old single-list-only Special Rules behavior from the UI.
+            - Moved Special rule line delay (ms) above the Special Rules table.
+            - Made the Special Rules line delay editable only in Advanced Mode.
+            - Added hover tooltips for Special Rules placeholders:
+              - {player}
+              - {roll}
+            - Removed {role} from the visible placeholder hint list.
+
+            Command Help
+            - Reworked !help into its own Command Help tab.
+            - Added editable help text lines for the Standard preset.
+            - !help now again filters output by active/available modules.
+            - Added a Help preset dropdown:
+              - Standard
+              - Compact
+              - Macro Mode
+            - Added a real Chat Preview showing what would be sent to chat, including the selected chat command prefix.
+            - Compact sends one line with command states.
+            - Macro Mode requires Advanced Mode.
+            - Added Macro Mode placeholders:
+              - {activeCommands}
+              - {commandStates}
+            - Added Macro Mode segment filters:
+              - {!tod}
+              - {!tod2}
+              - {!truth}
+              - {!dare}
+              - {!wifi}
+            - Macro Mode filters can now be used multiple times on the same line.
+            - A disabled filter hides only the text segment until the next filter placeholder, instead of hiding the whole line.
+            - Added grey placeholder/example text inside the Macro Mode text box.
+            - The Macro Mode placeholder disappears as soon as the user types into the box.
+
+            Chat Alias
+            - Added a new Chat Alias tab.
+            - Added Enable chat alias toggle in Settings.
+            - Added configurable alias word, for example Rainbow, banane, or any custom word.
+            - Added a command dropdown with supported /rt commands.
+            - Added a custom typed-text field for each alias command.
+            - Added a table for configured Chat Alias commands.
+            - Each Chat Alias row can be edited, deleted, enabled, or disabled.
+            - Disabled Chat Alias rows stay saved but are ignored by chat detection.
+            - Added /rt on alias and /rt off alias.
+            - Added Chat Alias to /rt status.
+            - Chat Alias is included in global enable/disable behavior.
+            - Auto-disable outside housing also disables Chat Alias.
+
+            Advanced Mode
+            - Added Advanced Mode in Settings.
+            - Advanced Mode is enabled through a confirmation popup.
+            - Added warning text before enabling Advanced Mode.
+            - Added a button to turn Advanced Mode off again.
+            - Moved technical line-delay fields behind Advanced Mode.
+            - Line-delay fields stay visible in normal mode but are greyed out.
+            - Hovering disabled line-delay fields explains that Advanced Mode is needed.
+            - Advanced-only fields include Normal ToD, Double ToD, Special Rules, Shell Infos, and Command Help delay controls.
+
+            Shell Infos
+            - Renamed the old !wifi tab to Shell Infos.
+            - Kept Shell Infos macro editing and manual run action.
+            - Shell Infos line delay is now Advanced Mode only.
+
+            Settings
+            - Renamed Enable ToD Second pair to Enable ToD - Doubles.
+            - Kept module toggles centralized in Settings.
+            - Added Open Changelog button in Settings.
+            - Added Enable chat alias button in Settings.
+            - Put the !help chat channel control inside the Command Help tab.
+
+            Changelog Window
+            - Added/reworked the Changelog window.
+            - Added a cleaner RollTracker-style changelog layout.
+            - Added Open Changelog button in Settings.
+
+            Defaults And Migration
+            - New default line delays are 1500 ms.
+            - Existing saved line delay values are kept during migration.
+            - Migrates old prompt lists into prompt sets.
+            - Migrates old Special Rules into Special Rule Sets.
+            - Adds default help lines when missing.
+            - Validates saved Help preset values.
+            - Cleans invalid Chat Alias entries during config migration.
+            """),
         new("0.1.0.49", """
             UI rework highlights:
             - Added selectable Modern, Standard, and Legacy layouts.
@@ -144,12 +297,41 @@ internal sealed class ChangelogWindow : Window, IDisposable
         ImGui.SameLine();
         ImGui.TextDisabled("RollTracker update");
         ImGui.Spacing();
-        ImGui.Bullet();
-        ImGui.SameLine();
-        ImGui.TextWrapped(entry.Text);
+        DrawEntryText(entry.Text);
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
+    }
+
+    private static void DrawEntryText(string text)
+    {
+        var lines = text
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n');
+
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.TrimEnd();
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                ImGui.Spacing();
+                continue;
+            }
+
+            var trimmed = line.TrimStart();
+            var indent = line.Length - trimmed.Length;
+            if (trimmed.StartsWith("- ", StringComparison.Ordinal))
+            {
+                ImGui.Indent(indent >= 2 ? 18 * ImGuiHelpers.GlobalScale : 0);
+                ImGui.Bullet();
+                ImGui.SameLine();
+                ImGui.TextWrapped(trimmed[2..]);
+                ImGui.Unindent(indent >= 2 ? 18 * ImGuiHelpers.GlobalScale : 0);
+                continue;
+            }
+
+            ImGui.TextColored(AccentColor, trimmed.TrimEnd(':'));
+        }
     }
 
     private void DrawFooter()
