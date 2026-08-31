@@ -13,9 +13,45 @@ internal sealed class ChangelogWindow : Window, IDisposable
     private static readonly Vector4 AccentColor = new(0.42f, 0.72f, 1.00f, 1.00f);
     private static readonly Vector4 SuccessColor = new(0.46f, 0.86f, 0.58f, 1.00f);
     private static readonly Vector4 PanelColor = new(0.08f, 0.10f, 0.11f, 0.92f);
+    private static readonly Version HistoryStartVersion = new(0, 1, 0, 53);
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.54", """
+            Bug fixes and polish
+
+            Roll Tracking
+            - Fixed a critical issue where some combat/action log events, such as Chakra or other class abilities, could be detected as /random rolls.
+            - RollTracker now only tracks real RandomNumber log messages and normal /random chat output.
+
+            ToD Suggestions
+            - Improved the Sets Manager layout for small windows.
+            - Added horizontal scrolling so the Sets Manager stays reachable when the window is narrow.
+            - Removed the Prompts column from the Sets Manager table.
+            - Removed the duplicate prompt count above the Truth and Dare prompt lists.
+            - Set names in the Sets Manager now wrap instead of being squeezed unreadably.
+
+            Command Help
+            - Standard preset command triggers are now fixed and cannot be edited.
+            - Only the help description text can be edited in the Standard preset.
+            - This prevents disabled modules from filtering the wrong help lines when command rows are changed.
+            - Fixed the Macro Mode tooltip when Advanced Mode is disabled.
+            - Fixed an issue where the line-delay tooltip could appear while hovering Macro Mode in the preset dropdown.
+            - Macro Mode now explains that Advanced Mode must be enabled to use it.
+
+            Changelog
+            - Fixed manual changelog opening from Settings showing an empty changelog after the update popup had already been acknowledged.
+            - Added a changelog history view when opening the changelog manually from Settings.
+            - Changelog history starts with the current UI rework changelog and can include future versions.
+
+            Settings
+            - Made Settings action buttons use a consistent fixed size.
+            - Settings action buttons no longer stretch across the full panel width.
+
+            ToD Result Output
+            - Added a separate !tod2 result line delay setting.
+            - Multi-line !tod2 result commands are now sent with a delay between lines instead of all at once.
+            """),
         new("0.1.0.53", """
             Highlights
             - Added a full UI rework with selectable layouts.
@@ -372,6 +408,8 @@ internal sealed class ChangelogWindow : Window, IDisposable
     private readonly Configuration configuration;
     private readonly Action saveConfiguration;
     private readonly string currentVersion;
+    private bool showHistory;
+    private int selectedHistoryEntryIndex = -1;
 
     public ChangelogWindow(Configuration configuration, Action saveConfiguration, string currentVersion)
         : base("RollTracker Changelog##RollTrackerChangelogWindow")
@@ -393,19 +431,26 @@ internal sealed class ChangelogWindow : Window, IDisposable
     {
     }
 
+    public void OpenHistory()
+    {
+        showHistory = true;
+        selectedHistoryEntryIndex = -1;
+        IsOpen = true;
+    }
+
     public override void Draw()
     {
         PushStyle();
         try
         {
             ImGui.TextColored(AccentColor, "RollTracker Changelog");
-            ImGui.TextDisabled($"Updated to {currentVersion}");
+            ImGui.TextDisabled(showHistory ? $"Installed version: {currentVersion}" : $"Updated to {currentVersion}");
             ImGui.Separator();
             DrawNavigationStrip();
 
             ImGui.Spacing();
-            ImGui.TextColored(AccentColor, $"RollTracker {currentVersion}");
-            ImGui.TextDisabled("Recent plugin changes and fixes");
+            ImGui.TextColored(AccentColor, GetEntryHeaderText());
+            ImGui.TextDisabled(showHistory ? "Browse current and older plugin changelogs" : "Recent plugin changes and fixes");
             ImGui.Separator();
 
             var footerHeight = 38 * ImGuiHelpers.GlobalScale;
@@ -424,18 +469,72 @@ internal sealed class ChangelogWindow : Window, IDisposable
         }
     }
 
-    private static void DrawNavigationStrip()
+    private void DrawNavigationStrip()
     {
         ImGui.PushStyleColor(ImGuiCol.ChildBg, PanelColor);
         if (ImGui.BeginChild("##RollTrackerChangelogStrip", new Vector2(0, 32 * ImGuiHelpers.GlobalScale), true))
         {
-            var text = "Changelog";
-            var textWidth = ImGui.CalcTextSize(text).X;
-            ImGui.SetCursorPosX(Math.Max(0, (ImGui.GetContentRegionAvail().X - textWidth) * 0.5f));
-            ImGui.TextColored(AccentColor, text);
+            if (showHistory)
+            {
+                DrawHistorySelector();
+            }
+            else
+            {
+                var text = "Changelog";
+                var textWidth = ImGui.CalcTextSize(text).X;
+                ImGui.SetCursorPosX(Math.Max(0, (ImGui.GetContentRegionAvail().X - textWidth) * 0.5f));
+                ImGui.TextColored(AccentColor, text);
+            }
         }
         ImGui.EndChild();
         ImGui.PopStyleColor();
+    }
+
+    private void DrawHistorySelector()
+    {
+        var historyEntries = GetHistoryEntries().ToList();
+        selectedHistoryEntryIndex = Math.Clamp(selectedHistoryEntryIndex, -1, historyEntries.Count - 1);
+
+        ImGui.TextColored(AccentColor, "Version");
+        ImGui.SameLine();
+
+        var preview = selectedHistoryEntryIndex < 0
+            ? "All versions"
+            : historyEntries[Math.Clamp(selectedHistoryEntryIndex, 0, historyEntries.Count - 1)].Version;
+        ImGui.SetNextItemWidth(Math.Max(180 * ImGuiHelpers.GlobalScale, ImGui.GetContentRegionAvail().X * 0.42f));
+        if (!ImGui.BeginCombo("##RollTrackerChangelogHistoryVersion", preview))
+        {
+            return;
+        }
+
+        if (ImGui.Selectable("All versions", selectedHistoryEntryIndex < 0))
+        {
+            selectedHistoryEntryIndex = -1;
+        }
+
+        for (var i = 0; i < historyEntries.Count; i++)
+        {
+            var entry = historyEntries[i];
+            if (ImGui.Selectable(entry.Version, selectedHistoryEntryIndex == i))
+            {
+                selectedHistoryEntryIndex = i;
+            }
+        }
+
+        ImGui.EndCombo();
+    }
+
+    private string GetEntryHeaderText()
+    {
+        if (!showHistory || selectedHistoryEntryIndex < 0)
+        {
+            return $"RollTracker {currentVersion}";
+        }
+
+        var historyEntries = GetHistoryEntries().ToList();
+        return historyEntries.Count == 0
+            ? $"RollTracker {currentVersion}"
+            : $"RollTracker {historyEntries[Math.Clamp(selectedHistoryEntryIndex, 0, historyEntries.Count - 1)].Version}";
     }
 
     private void DrawEntries()
@@ -532,6 +631,14 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private IEnumerable<ChangelogEntry> GetVisibleEntries()
     {
+        if (showHistory)
+        {
+            var historyEntries = GetHistoryEntries().ToList();
+            return selectedHistoryEntryIndex < 0
+                ? historyEntries
+                : [historyEntries[Math.Clamp(selectedHistoryEntryIndex, 0, historyEntries.Count - 1)]];
+        }
+
         if (!Version.TryParse(configuration.LastSeenChangelogVersion, out var lastSeenVersion))
         {
             return Entries.Take(5);
@@ -540,6 +647,13 @@ internal sealed class ChangelogWindow : Window, IDisposable
         return Entries.Where(entry =>
             Version.TryParse(entry.Version, out var entryVersion) &&
             entryVersion > lastSeenVersion);
+    }
+
+    private static IEnumerable<ChangelogEntry> GetHistoryEntries()
+    {
+        return Entries.Where(entry =>
+            Version.TryParse(entry.Version, out var entryVersion) &&
+            entryVersion >= HistoryStartVersion);
     }
 
     private void MarkSeenAndClose()

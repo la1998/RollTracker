@@ -18,8 +18,10 @@ RollTracker publishes stable builds through `dist/RollTracker/latest.zip` and te
 
 To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's Experimental settings. Testing builds are offered only when `TestingAssemblyVersion` in `repo.json` is higher than the stable `AssemblyVersion`.
 
-Current stable: `0.1.0.44`
-Current testing: `0.1.0.45`
+For local offline testing before publishing a GitHub testing build, see [LOCAL_DEV.md](LOCAL_DEV.md).
+
+Current stable: `0.1.0.47`
+Current testing: `0.1.0.54`
 
 ## Commands
 

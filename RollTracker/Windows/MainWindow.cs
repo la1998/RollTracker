@@ -37,6 +37,16 @@ internal sealed class MainWindow : Window, IDisposable
         "Compact",
         "Macro Mode",
     ];
+    private static readonly string[] StandardHelpCommands =
+    [
+        "!help",
+        "!tod",
+        "!tod2",
+        "!truth",
+        "!dare",
+        "!wifi",
+    ];
+    private static readonly Vector2 SettingsButtonSize = new(190, 0);
 
     private static readonly (string Label, string Args)[] ChatAliasCommandOptions =
     [
@@ -538,6 +548,7 @@ internal sealed class MainWindow : Window, IDisposable
             configuration.TodSecondPairResultCommandTemplate = secondResultCommand;
             saveConfiguration();
         }
+        DrawTodSecondPairResultLineDelayInput("Quick");
 
         var notEnoughRoundPlayersResultText = configuration.TodSecondPairNotEnoughRoundPlayersResultText;
         ImGui.TextDisabled("Not enough players text");
@@ -739,6 +750,7 @@ internal sealed class MainWindow : Window, IDisposable
             configuration.TodSecondPairResultCommandTemplate = secondPairResultCommandTemplate;
             saveConfiguration();
         }
+        DrawTodSecondPairResultLineDelayInput("Legacy");
 
         var secondPairNotEnoughRoundPlayersResultText = configuration.TodSecondPairNotEnoughRoundPlayersResultText;
         if (ImGui.InputText("Not enough players text##Tod2Legacy", ref secondPairNotEnoughRoundPlayersResultText, 512))
@@ -888,7 +900,7 @@ internal sealed class MainWindow : Window, IDisposable
             saveConfiguration();
         }
 
-        if (ImGui.Button("Open config folder"))
+        if (DrawSettingsButton("Open config folder"))
         {
             OpenConfigFolder();
         }
@@ -900,14 +912,14 @@ internal sealed class MainWindow : Window, IDisposable
         DrawModuleToggle("Enable Wifi", configuration.WifiEnabled, rollTrackerService.SetWifiEnabled);
 
         DrawSettingsSection("Global");
-        if (ImGui.Button("Enable all"))
+        if (DrawSettingsButton("Enable all"))
         {
             rollTrackerService.SetAllModulesEnabled(true);
         }
 
         ImGui.SameLine();
 
-        if (ImGui.Button("Disable all"))
+        if (DrawSettingsButton("Disable all"))
         {
             rollTrackerService.SetAllModulesEnabled(false);
         }
@@ -1080,12 +1092,11 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.TextUnformatted("Sets Manager");
         ImGui.Separator();
 
-        if (ImGui.BeginTable("RollTrackerLegacySetManagerTable", 4, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
+        if (ImGui.BeginTable("RollTrackerLegacySetManagerTable", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
         {
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 48 * ImGuiHelpers.GlobalScale);
             ImGui.TableSetupColumn("Set Name");
             ImGui.TableSetupColumn("State", ImGuiTableColumnFlags.WidthFixed, 48 * ImGuiHelpers.GlobalScale);
-            ImGui.TableSetupColumn("Prompts", ImGuiTableColumnFlags.WidthFixed, 58 * ImGuiHelpers.GlobalScale);
             ImGui.TableHeadersRow();
 
             DrawLegacySetManagerRows("Truth", configuration.TruthPromptSets);
@@ -1125,7 +1136,8 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.TextUnformatted(type);
             ImGui.TableNextColumn();
             ImGui.PushStyleColor(ImGuiCol.Text, textColor);
-            if (ImGui.Selectable($"{setName}##Legacy{type}SetManager{i}", enabled, ImGuiSelectableFlags.SpanAllColumns))
+            ImGui.TextWrapped(setName);
+            if (ImGui.IsItemClicked())
             {
                 promptSet.Enabled = !enabled;
                 promptSets[i] = promptSet;
@@ -1140,8 +1152,6 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.PopStyleColor();
             ImGui.TableNextColumn();
             ImGui.TextColored(textColor, enabled ? "On" : "Off");
-            ImGui.TableNextColumn();
-            ImGui.TextColored(textColor, (promptSet.Prompts?.Count ?? 0).ToString());
         }
     }
 
@@ -1170,6 +1180,7 @@ internal sealed class MainWindow : Window, IDisposable
             configuration.TodSecondPairResultCommandTemplate = resultCommandTemplate;
             saveConfiguration();
         }
+        DrawTodSecondPairResultLineDelayInput("Modern");
 
         var notEnoughRoundPlayersResultText = configuration.TodSecondPairNotEnoughRoundPlayersResultText;
         ImGui.SetNextItemWidth(-1);
@@ -1219,9 +1230,36 @@ internal sealed class MainWindow : Window, IDisposable
         }
     }
 
+    private void DrawTodSecondPairResultLineDelayInput(string id)
+    {
+        var resultLineDelayMilliseconds = configuration.TodSecondPairResultLineDelayMilliseconds;
+        ImGui.SetNextItemWidth(170 * ImGuiHelpers.GlobalScale);
+        if (DrawAdvancedInputInt($"Result line delay (ms)##{id}Tod2ResultLineDelay", ref resultLineDelayMilliseconds))
+        {
+            configuration.TodSecondPairResultLineDelayMilliseconds = Math.Clamp(resultLineDelayMilliseconds, 100, 10000);
+            saveConfiguration();
+        }
+
+        DrawLineDelayTooltip("Delay between !tod2 result command lines. Leave this alone unless result chat lines are skipped.");
+    }
+
     private void DrawTruthDarePromptTab()
     {
-        BeginPanel("Prompt toolbar", new Vector2(0, 70 * ImGuiHelpers.GlobalScale));
+        var visibleSize = ImGui.GetContentRegionAvail();
+        var contentWidth = Math.Max(820 * ImGuiHelpers.GlobalScale, visibleSize.X);
+        ImGui.SetNextWindowContentSize(new Vector2(contentWidth, 0));
+
+        if (!ImGui.BeginChild(
+            "##RollTrackerTruthDarePromptScroll",
+            Vector2.Zero,
+            false,
+            ImGuiWindowFlags.HorizontalScrollbar))
+        {
+            ImGui.EndChild();
+            return;
+        }
+
+        BeginPanel("Prompt toolbar", new Vector2(contentWidth, 70 * ImGuiHelpers.GlobalScale));
         DrawStatusPill("!truth", configuration.TruthTriggerEnabled);
         ImGui.SameLine();
         DrawStatusPill("!dare", configuration.DareTriggerEnabled);
@@ -1231,10 +1269,9 @@ internal sealed class MainWindow : Window, IDisposable
 
         ImGui.Spacing();
 
-        var available = ImGui.GetContentRegionAvail();
         var spacing = ImGui.GetStyle().ItemSpacing.X;
-        var managerWidth = Math.Max(180 * ImGuiHelpers.GlobalScale, available.X * 0.22f);
-        var promptWidth = Math.Max(360 * ImGuiHelpers.GlobalScale, available.X - managerWidth - spacing);
+        var managerWidth = 270 * ImGuiHelpers.GlobalScale;
+        var promptWidth = Math.Max(500 * ImGuiHelpers.GlobalScale, contentWidth - managerWidth - spacing);
 
         BeginPanel("Prompt Sets", new Vector2(promptWidth, 0));
         if (ImGui.BeginTabBar("RollTrackerModernSuggestionTabs"))
@@ -1273,6 +1310,7 @@ internal sealed class MainWindow : Window, IDisposable
 
         ImGui.SameLine();
         DrawSetManager(new Vector2(managerWidth, 0));
+        ImGui.EndChild();
     }
 
     private void DrawPromptSetTabs(
@@ -1436,7 +1474,6 @@ internal sealed class MainWindow : Window, IDisposable
     private void DrawPromptList(string label, List<string> prompts, ref string newPrompt)
     {
         ImGui.Spacing();
-        DrawSectionTitle($"{prompts.Count} {label.ToLowerInvariant()} prompts");
 
         var tableSize = new Vector2(0, Math.Max(180 * ImGuiHelpers.GlobalScale, ImGui.GetContentRegionAvail().Y - 78 * ImGuiHelpers.GlobalScale));
         if (ImGui.BeginTable($"{label}PromptTable", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp, tableSize))
@@ -1491,12 +1528,11 @@ internal sealed class MainWindow : Window, IDisposable
     {
         BeginPanel("Sets Manager", size);
 
-        if (ImGui.BeginTable("RollTrackerSetManagerTable", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchProp))
+        if (ImGui.BeginTable("RollTrackerSetManagerTable", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchProp))
         {
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 48 * ImGuiHelpers.GlobalScale);
             ImGui.TableSetupColumn("Set Name");
             ImGui.TableSetupColumn("State", ImGuiTableColumnFlags.WidthFixed, 48 * ImGuiHelpers.GlobalScale);
-            ImGui.TableSetupColumn("Prompts", ImGuiTableColumnFlags.WidthFixed, 58 * ImGuiHelpers.GlobalScale);
             ImGui.TableHeadersRow();
 
             DrawSetManagerRows("Truth", configuration.TruthPromptSets);
@@ -1531,7 +1567,8 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.TextDisabled(type);
             ImGui.TableNextColumn();
             ImGui.PushStyleColor(ImGuiCol.Text, textColor);
-            if (ImGui.Selectable($"{setName}##{type}SetManager{i}", enabled, ImGuiSelectableFlags.SpanAllColumns))
+            ImGui.TextWrapped(setName);
+            if (ImGui.IsItemClicked())
             {
                 promptSet.Enabled = !enabled;
                 promptSets[i] = promptSet;
@@ -1546,8 +1583,6 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.PopStyleColor();
             ImGui.TableNextColumn();
             ImGui.TextColored(textColor, enabled ? "On" : "Off");
-            ImGui.TableNextColumn();
-            ImGui.TextColored(textColor, (promptSet.Prompts?.Count ?? 0).ToString());
         }
     }
 
@@ -2158,7 +2193,7 @@ internal sealed class MainWindow : Window, IDisposable
         }
 
         DrawChatChannelCombo("Chat", configuration.HelpChatChannel, channel => configuration.HelpChatChannel = channel);
-        DrawHelpPresetCombo(id);
+        var helpPresetComboOpen = DrawHelpPresetCombo(id);
 
         var helpInitialDelay = configuration.HelpInitialDelayMilliseconds;
         ImGui.SetNextItemWidth(170 * ImGuiHelpers.GlobalScale);
@@ -2167,7 +2202,10 @@ internal sealed class MainWindow : Window, IDisposable
             configuration.HelpInitialDelayMilliseconds = Math.Clamp(helpInitialDelay, 0, 10000);
             saveConfiguration();
         }
-        DrawLineDelayTooltip("Delay before the first help line is sent.");
+        if (!helpPresetComboOpen)
+        {
+            DrawLineDelayTooltip("Delay before the first help line is sent.");
+        }
 
         var helpLineDelay = configuration.HelpLineDelayMilliseconds;
         ImGui.SetNextItemWidth(170 * ImGuiHelpers.GlobalScale);
@@ -2176,7 +2214,10 @@ internal sealed class MainWindow : Window, IDisposable
             configuration.HelpLineDelayMilliseconds = Math.Clamp(helpLineDelay, 100, 10000);
             saveConfiguration();
         }
-        DrawLineDelayTooltip("Delay between help chat lines.");
+        if (!helpPresetComboOpen)
+        {
+            DrawLineDelayTooltip("Delay between help chat lines.");
+        }
 
         ImGui.Spacing();
         if (configuration.HelpPreset.Equals("Standard", StringComparison.Ordinal) &&
@@ -2204,15 +2245,17 @@ internal sealed class MainWindow : Window, IDisposable
         }
     }
 
-    private void DrawHelpPresetCombo(string id)
+    private bool DrawHelpPresetCombo(string id)
     {
         var selectedPreset = HelpPresetNames.Contains(configuration.HelpPreset)
             ? configuration.HelpPreset
             : HelpPresetNames[0];
 
+        var comboOpen = false;
         ImGui.SetNextItemWidth(230 * ImGuiHelpers.GlobalScale);
         if (ImGui.BeginCombo($"Help preset##{id}", selectedPreset))
         {
+            comboOpen = true;
             foreach (var preset in HelpPresetNames)
             {
                 var requiresAdvanced = preset.Equals("Macro Mode", StringComparison.Ordinal);
@@ -2230,7 +2273,7 @@ internal sealed class MainWindow : Window, IDisposable
 
                 if (requiresAdvanced && !configuration.AdvancedMode)
                 {
-                    DrawAdvancedModeOnlyTooltip();
+                    DrawAdvancedModeOnlyTooltip("Enable Advanced mode in Settings to use Macro Mode.");
                     ImGui.EndDisabled();
                 }
             }
@@ -2243,6 +2286,8 @@ internal sealed class MainWindow : Window, IDisposable
             configuration.HelpPreset = "Standard";
             saveConfiguration();
         }
+
+        return comboOpen;
     }
 
     private void DrawCommandHelpPresetPreview()
@@ -2425,6 +2470,8 @@ internal sealed class MainWindow : Window, IDisposable
 
     private void DrawCommandHelpLineEditor(string id, bool legacyStyle)
     {
+        NormalizeStandardHelpLines();
+
         var tableFlags = (legacyStyle ? ImGuiTableFlags.Borders : ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.ScrollY) |
                          ImGuiTableFlags.RowBg |
                          ImGuiTableFlags.SizingStretchProp;
@@ -2432,22 +2479,30 @@ internal sealed class MainWindow : Window, IDisposable
             ? Vector2.Zero
             : new Vector2(0, Math.Max(170 * ImGuiHelpers.GlobalScale, ImGui.GetContentRegionAvail().Y - 76 * ImGuiHelpers.GlobalScale));
 
-        if (ImGui.BeginTable($"RollTracker{id}CommandHelpLines", 1, tableFlags, tableSize))
+        if (ImGui.BeginTable($"RollTracker{id}CommandHelpLines", 2, tableFlags, tableSize))
         {
-            ImGui.TableSetupColumn("Help line");
+            ImGui.TableSetupColumn("Command", ImGuiTableColumnFlags.WidthFixed, 78 * ImGuiHelpers.GlobalScale);
+            ImGui.TableSetupColumn("Text");
             ImGui.TableHeadersRow();
 
-            for (var i = 0; i < configuration.HelpLines.Count; i++)
+            for (var i = 0; i < StandardHelpCommands.Length; i++)
             {
+                var command = StandardHelpCommands[i];
                 ImGui.PushID($"{id}HelpLine{i}");
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
-
-                var helpLine = configuration.HelpLines[i];
-                ImGui.SetNextItemWidth(-1);
-                if (ImGui.InputText("##HelpLine", ref helpLine, 512))
+                ImGui.TextColored(AccentColor, command);
+                if (ImGui.IsItemHovered())
                 {
-                    configuration.HelpLines[i] = helpLine;
+                    ImGui.SetTooltip("Command trigger is fixed so module toggles can filter help lines correctly.");
+                }
+
+                ImGui.TableNextColumn();
+                var description = GetHelpLineDescription(configuration.HelpLines[i], command);
+                ImGui.SetNextItemWidth(-1);
+                if (ImGui.InputText("##HelpLineText", ref description, 512))
+                {
+                    configuration.HelpLines[i] = BuildStandardHelpLine(command, description);
                     saveConfiguration();
                 }
 
@@ -2456,6 +2511,47 @@ internal sealed class MainWindow : Window, IDisposable
 
             ImGui.EndTable();
         }
+    }
+
+    private void NormalizeStandardHelpLines()
+    {
+        var defaultLines = Configuration.CreateDefaultHelpLines();
+        var normalizedLines = new List<string>();
+
+        for (var i = 0; i < StandardHelpCommands.Length; i++)
+        {
+            var command = StandardHelpCommands[i];
+            var defaultLine = i < defaultLines.Count ? defaultLines[i] : $"{command} -";
+            var sourceLine = configuration.HelpLines
+                .FirstOrDefault(line => StartsWithHelpCommand(line, command)) ?? defaultLine;
+            normalizedLines.Add(BuildStandardHelpLine(command, GetHelpLineDescription(sourceLine, command)));
+        }
+
+        if (!configuration.HelpLines.SequenceEqual(normalizedLines, StringComparer.Ordinal))
+        {
+            configuration.HelpLines = normalizedLines;
+            saveConfiguration();
+        }
+    }
+
+    private static string BuildStandardHelpLine(string command, string description)
+    {
+        description = description.Trim();
+        return string.IsNullOrWhiteSpace(description)
+            ? $"{command} -"
+            : $"{command} - {description}";
+    }
+
+    private static string GetHelpLineDescription(string helpLine, string command)
+    {
+        var description = helpLine.Trim();
+        if (StartsWithHelpCommand(description, command))
+        {
+            description = description[command.Length..].TrimStart();
+        }
+
+        description = description.TrimStart('-', ':', '=', ' ', '\t');
+        return description.Trim();
     }
 
     private void DrawSettingsTab()
@@ -2510,7 +2606,7 @@ internal sealed class MainWindow : Window, IDisposable
         }
 
         ImGui.Spacing();
-        if (ImGui.Button("Open config folder", new Vector2(-1, 0)))
+        if (DrawSettingsButton("Open config folder"))
         {
             OpenConfigFolder();
         }
@@ -2521,12 +2617,14 @@ internal sealed class MainWindow : Window, IDisposable
 
         ImGui.Spacing();
         DrawSectionTitle("Global controls");
-        if (ImGui.Button("Enable all", new Vector2(-1, 0)))
+        if (DrawSettingsButton("Enable all"))
         {
             rollTrackerService.SetAllModulesEnabled(true);
         }
 
-        if (ImGui.Button("Disable all", new Vector2(-1, 0)))
+        ImGui.SameLine();
+
+        if (DrawSettingsButton("Disable all"))
         {
             rollTrackerService.SetAllModulesEnabled(false);
         }
@@ -2564,7 +2662,7 @@ internal sealed class MainWindow : Window, IDisposable
     private void DrawOpenChangelogButton()
     {
         ImGui.Spacing();
-        if (ImGui.Button("Open Changelog", new Vector2(150 * ImGuiHelpers.GlobalScale, 0)))
+        if (DrawSettingsButton("Open Changelog"))
         {
             openChangelogWindow();
         }
@@ -2576,7 +2674,7 @@ internal sealed class MainWindow : Window, IDisposable
         {
             ImGui.TextColored(WarningColor, "Advanced mode is enabled.");
             ImGui.SameLine();
-            if (ImGui.Button("Turn off Advanced mode", new Vector2(190 * ImGuiHelpers.GlobalScale, 0)))
+            if (DrawSettingsButton("Turn off Advanced mode"))
             {
                 configuration.AdvancedMode = false;
                 saveConfiguration();
@@ -2584,7 +2682,7 @@ internal sealed class MainWindow : Window, IDisposable
             return;
         }
 
-        if (ImGui.Button("Turn on Advanced mode", new Vector2(190 * ImGuiHelpers.GlobalScale, 0)))
+        if (DrawSettingsButton("Turn on Advanced mode"))
         {
             ImGui.OpenPopup("Enable Advanced Mode?##RollTrackerAdvancedMode");
         }
@@ -2605,7 +2703,7 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.TextWrapped("Advanced mode may expose settings that can make RollTracker stop working correctly if you change things without knowing what they do.");
         ImGui.Spacing();
 
-        if (ImGui.Button("Enable Advanced mode", new Vector2(170 * ImGuiHelpers.GlobalScale, 0)))
+        if (DrawSettingsButton("Enable Advanced mode"))
         {
             configuration.AdvancedMode = true;
             saveConfiguration();
@@ -2614,7 +2712,7 @@ internal sealed class MainWindow : Window, IDisposable
 
         ImGui.SameLine();
 
-        if (ImGui.Button("Cancel", new Vector2(100 * ImGuiHelpers.GlobalScale, 0)))
+        if (DrawSettingsButton("Cancel"))
         {
             ImGui.CloseCurrentPopup();
         }
@@ -2806,6 +2904,11 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.Spacing();
     }
 
+    private static bool DrawSettingsButton(string label)
+    {
+        return ImGui.Button(label, SettingsButtonSize * ImGuiHelpers.GlobalScale);
+    }
+
     private static void DrawSummaryLine(string label, RollEntry? roll)
     {
         ImGui.TextUnformatted($"{label}:");
@@ -2994,7 +3097,7 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.BeginDisabled();
         ImGui.InputInt(label, ref value);
         ImGui.EndDisabled();
-        DrawAdvancedModeOnlyTooltip();
+        DrawAdvancedModeOnlyTooltip("Enable Advanced mode in Settings to edit line delay fields.");
         return false;
     }
 
@@ -3006,14 +3109,14 @@ internal sealed class MainWindow : Window, IDisposable
             return;
         }
 
-        DrawAdvancedModeOnlyTooltip();
+        DrawAdvancedModeOnlyTooltip("Enable Advanced mode in Settings to edit line delay fields.");
     }
 
-    private static void DrawAdvancedModeOnlyTooltip()
+    private static void DrawAdvancedModeOnlyTooltip(string text)
     {
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
         {
-            ImGui.SetTooltip("Enable Advanced mode in Settings to edit line delay fields.");
+            ImGui.SetTooltip(text);
         }
     }
 

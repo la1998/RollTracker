@@ -109,7 +109,7 @@ public sealed class Plugin : IDalamudPlugin
             ChatGui,
             SaveConfiguration,
             () => RollHistoryWindow.IsOpen = true,
-            () => ChangelogWindow.IsOpen = true);
+            ChangelogWindow.OpenHistory);
 
         WindowSystem.AddWindow(MainWindow);
         WindowSystem.AddWindow(RollHistoryWindow);
@@ -430,6 +430,12 @@ public sealed class Plugin : IDalamudPlugin
         if (Configuration.HelpInitialDelayMilliseconds <= 0)
         {
             Configuration.HelpInitialDelayMilliseconds = 500;
+            changed = true;
+        }
+
+        if (Configuration.TodSecondPairResultLineDelayMilliseconds <= 0)
+        {
+            Configuration.TodSecondPairResultLineDelayMilliseconds = 1500;
             changed = true;
         }
 

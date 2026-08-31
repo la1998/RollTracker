@@ -41,6 +41,8 @@ public sealed class Configuration : IPluginConfiguration
 
     public int TodSecondPairMacroLineDelayMilliseconds { get; set; } = 1500;
 
+    public int TodSecondPairResultLineDelayMilliseconds { get; set; } = 1500;
+
     public int TodSpecialRuleLineDelayMilliseconds { get; set; } = 1500;
 
     public string MacroText { get; set; } = "/y ♦ Time for Truth or Dare ♦  Highest number asks the lowest number, \"Truth or Dare?\"  Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Dalamud.Game.Chat;
+using Dalamud.Game.Text;
 using Dalamud.Plugin.Services;
 using Lumina.Excel.Sheets;
 
@@ -124,6 +125,14 @@ internal sealed partial class RollTrackerService : IDisposable
         pendingMacroSteps.Clear();
 
         var resultCommands = BuildRoundResultCommands();
+        if (currentRoundKind == RoundKind.SecondPair)
+        {
+            QueueSecondPairResultCommands(resultCommands);
+            Reset();
+            currentRoundKind = RoundKind.Normal;
+            return;
+        }
+
         var anyCommandFailed = false;
         foreach (var resultCommand in resultCommands)
         {
@@ -149,10 +158,25 @@ internal sealed partial class RollTrackerService : IDisposable
         currentRoundKind = RoundKind.Normal;
     }
 
-    private void QueueSpecialRuleResultCommands(IEnumerable<RoundResultCommand> resultCommands)
+    private void QueueSecondPairResultCommands(IEnumerable<RoundResultCommand> resultCommands)
+    {
+        var delayMilliseconds = ClampMacroLineDelay(configuration.TodSecondPairResultLineDelayMilliseconds);
+        var nextExecuteAt = DateTimeOffset.Now;
+        var resultCommandList = resultCommands.ToList();
+
+        foreach (var resultCommand in resultCommandList.Where(command => !command.IsSpecialRule))
+        {
+            pendingTodPromptCommands.Enqueue(new DelayedCommand(resultCommand.Command, "result message", nextExecuteAt));
+            nextExecuteAt = nextExecuteAt.AddMilliseconds(delayMilliseconds);
+        }
+
+        QueueSpecialRuleResultCommands(resultCommandList, nextExecuteAt);
+    }
+
+    private void QueueSpecialRuleResultCommands(IEnumerable<RoundResultCommand> resultCommands, DateTimeOffset? firstExecuteAt = null)
     {
         var delayMilliseconds = ClampMacroLineDelay(configuration.TodSpecialRuleLineDelayMilliseconds);
-        var nextExecuteAt = DateTimeOffset.Now.AddMilliseconds(delayMilliseconds);
+        var nextExecuteAt = firstExecuteAt ?? DateTimeOffset.Now.AddMilliseconds(delayMilliseconds);
 
         foreach (var resultCommand in resultCommands.Where(command => command.IsSpecialRule))
         {
@@ -774,6 +798,11 @@ internal sealed partial class RollTrackerService : IDisposable
             return;
         }
 
+        if (!IsRandomNumberLogMessage(logMessage))
+        {
+            return;
+        }
+
         var source = logMessage.SourceEntity;
         if (source is null || !source.IsPlayer)
         {
@@ -813,6 +842,17 @@ internal sealed partial class RollTrackerService : IDisposable
         }
 
         AddRoll(playerName, value);
+    }
+
+    private static bool IsRandomNumberLogMessage(ILogMessage logMessage)
+    {
+        if (!logMessage.GameData.IsValid)
+        {
+            return false;
+        }
+
+        var logKind = logMessage.GameData.Value.LogKind;
+        return logKind.IsValid && logKind.RowId == (uint)XivChatType.RandomNumber;
     }
 
     private void AddRoll(string playerName, int value)
@@ -988,7 +1028,7 @@ internal sealed partial class RollTrackerService : IDisposable
         var delayedCommand = pendingTodPromptCommands.Dequeue();
         if (!TryExecuteTextCommand(delayedCommand.Command))
         {
-            chatGui.PrintError($"Could not send {delayedCommand.PromptType} prompt.", "RollTracker");
+            chatGui.PrintError($"Could not send {delayedCommand.PromptType}.", "RollTracker");
         }
     }
 
