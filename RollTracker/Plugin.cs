@@ -492,7 +492,9 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         if (string.IsNullOrWhiteSpace(Configuration.UiLayout) ||
-            Configuration.UiLayout.Equals("Modern", StringComparison.Ordinal))
+            (!Configuration.UiLayout.Equals("Standard", StringComparison.Ordinal) &&
+             !Configuration.UiLayout.Equals("Modern", StringComparison.Ordinal) &&
+             !Configuration.UiLayout.Equals("Legacy", StringComparison.Ordinal)))
         {
             Configuration.UiLayout = "Standard";
             changed = true;

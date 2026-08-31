@@ -4,7 +4,7 @@
     "Name": "RollTracker",
     "InternalName": "RollTracker",
     "AssemblyVersion": "0.1.0.47",
-    "TestingAssemblyVersion": "0.1.0.54",
+    "TestingAssemblyVersion": "0.1.0.55",
     "TestingDalamudApiLevel": 15,
     "TestingChangelog": "Bug fixes and polish\n\nRoll Tracking\n- Fixed a critical issue where some combat/action log events, such as Chakra or other class abilities, could be detected as /random rolls.\n- RollTracker now only tracks real RandomNumber log messages and normal /random chat output.\n\nToD Suggestions\n- Improved the Sets Manager layout for small windows.\n- Added horizontal scrolling so the Sets Manager stays reachable when the window is narrow.\n- Removed the Prompts column from the Sets Manager table.\n- Removed the duplicate prompt count above the Truth and Dare prompt lists.\n- Set names in the Sets Manager now wrap instead of being squeezed unreadably.\n\nCommand Help\n- Standard preset command triggers are now fixed and cannot be edited.\n- Only the help description text can be edited in the Standard preset.\n- This prevents disabled modules from filtering the wrong help lines when command rows are changed.\n- Fixed the Macro Mode tooltip when Advanced Mode is disabled.\n- Fixed an issue where the line-delay tooltip could appear while hovering Macro Mode in the preset dropdown.\n- Macro Mode now explains that Advanced Mode must be enabled to use it.\n\nChangelog\n- Fixed manual changelog opening from Settings showing an empty changelog after the update popup had already been acknowledged.\n- Added a changelog history view when opening the changelog manually from Settings.\n- Changelog history starts with the current UI rework changelog and can include future versions.\n\nSettings\n- Made Settings action buttons use a consistent fixed size.\n- Settings action buttons no longer stretch across the full panel width.\n\nToD Result Output\n- Added a separate !tod2 result line delay setting.\n- Multi-line !tod2 result commands are now sent with a delay between lines instead of all at once.",
     "Description": "Reads chat messages, detects /random rolls, tracks Truth or Dare rounds, and provides configurable !truth, !dare, !help, !tod2, and !wifi helpers.\n\nCommands:\n/rt - open or close the window.\n/rt help - show the full command and trigger list locally.",
@@ -23,9 +23,9 @@
     "Punchline": "Tracks /random rolls for private round games.",
     "AcceptsFeedback": false,
     "DownloadLinkInstall": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
-    "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.54",
+    "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.55",
     "DownloadLinkUpdate": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
     "RepoUrl": "https://github.com/la1998/RollTracker",
-    "LastUpdate": "1788206257"
+    "LastUpdate": "1788208364"
   }
 ]

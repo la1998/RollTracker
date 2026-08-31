@@ -308,7 +308,6 @@ internal sealed class MainWindow : Window, IDisposable
     private void DrawSidebar()
     {
         ImGui.TextColored(AccentColor, "RollTracker");
-        ImGui.TextDisabled("UI Rework");
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
