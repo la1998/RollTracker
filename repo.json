@@ -4,9 +4,9 @@
   "Name": "RollTracker",
   "InternalName": "RollTracker",
   "AssemblyVersion": "0.1.0.47",
-  "TestingAssemblyVersion": "0.1.0.51",
+  "TestingAssemblyVersion": "0.1.0.52",
   "TestingDalamudApiLevel": 15,
-  "TestingChangelog": "Testing fixes: Standard is now the default UI layout, and the Truth or Dare tab now shows the missing Not enough players text fields for normal ToD and both Double ToD fallback fields in Modern and Standard layouts.",
+  "TestingChangelog": "Testing UI fix: Macro, Result command, Not enough players text, and Not enough second pair text now show matching field titles in the Modern and Standard Truth or Dare tab.",
   "Description": "Reads chat messages, detects /random rolls, tracks Truth or Dare rounds, and provides configurable !truth, !dare, !help, !tod2, and !wifi helpers.\n\nCommands:\n/rt - open or close the window.\n/rt help - show the full command and trigger list locally.",
   "ApplicableVersion": "any",
   "Tags": [
@@ -23,9 +23,9 @@
   "Punchline": "Tracks /random rolls for private round games.",
   "AcceptsFeedback": false,
   "DownloadLinkInstall": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
-  "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.51",
+  "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.52",
   "DownloadLinkUpdate": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
   "RepoUrl": "https://github.com/la1998/RollTracker",
-  "LastUpdate": "1788135114"
+  "LastUpdate": "1788135514"
 }
 ]

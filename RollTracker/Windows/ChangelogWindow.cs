@@ -16,6 +16,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.52", "Testing UI fix: Macro, Result command, Not enough players text, and Not enough second pair text now show matching field titles in the Modern and Standard Truth or Dare tab."),
         new("0.1.0.51", """
             Testing fixes
             - Standard is now the default UI layout for new installs and migrated testing configs.

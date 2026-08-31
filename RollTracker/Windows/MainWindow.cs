@@ -479,24 +479,27 @@ internal sealed class MainWindow : Window, IDisposable
         configuration.MacroLineDelayMilliseconds = lineDelayMilliseconds;
 
         var macroText = configuration.MacroText;
+        ImGui.TextDisabled("Macro");
         ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputTextMultiline("!tod message##TodMacroText", ref macroText, 4096, new Vector2(0, 64 * ImGuiHelpers.GlobalScale)))
+        if (ImGui.InputTextMultiline("##TodMacroText", ref macroText, 4096, new Vector2(0, 64 * ImGuiHelpers.GlobalScale)))
         {
             configuration.MacroText = macroText;
             saveConfiguration();
         }
 
         var resultCommand = configuration.ResultCommandTemplate;
+        ImGui.TextDisabled("Result command");
         ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputText("!tod result##TodResult", ref resultCommand, 512))
+        if (ImGui.InputText("##TodResult", ref resultCommand, 512))
         {
             configuration.ResultCommandTemplate = resultCommand;
             saveConfiguration();
         }
 
         var notEnoughPlayersResultText = configuration.NotEnoughPlayersResultText;
+        ImGui.TextDisabled("Not enough players text");
         ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputText("Not enough players text##TodQuick", ref notEnoughPlayersResultText, 512))
+        if (ImGui.InputText("##TodQuickNotEnoughPlayers", ref notEnoughPlayersResultText, 512))
         {
             configuration.NotEnoughPlayersResultText = notEnoughPlayersResultText;
             saveConfiguration();
@@ -519,32 +522,36 @@ internal sealed class MainWindow : Window, IDisposable
         configuration.TodSecondPairMacroLineDelayMilliseconds = secondPairLineDelayMilliseconds;
 
         var secondMacroText = configuration.TodSecondPairMacroText;
+        ImGui.TextDisabled("Macro");
         ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputTextMultiline("!tod2 message##Tod2MacroText", ref secondMacroText, 4096, new Vector2(0, 64 * ImGuiHelpers.GlobalScale)))
+        if (ImGui.InputTextMultiline("##Tod2MacroText", ref secondMacroText, 4096, new Vector2(0, 64 * ImGuiHelpers.GlobalScale)))
         {
             configuration.TodSecondPairMacroText = secondMacroText;
             saveConfiguration();
         }
 
         var secondResultCommand = configuration.TodSecondPairResultCommandTemplate;
+        ImGui.TextDisabled("Result command");
         ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputTextMultiline("!tod2 result##Tod2Result", ref secondResultCommand, 1024, new Vector2(0, 46 * ImGuiHelpers.GlobalScale)))
+        if (ImGui.InputTextMultiline("##Tod2Result", ref secondResultCommand, 1024, new Vector2(0, 46 * ImGuiHelpers.GlobalScale)))
         {
             configuration.TodSecondPairResultCommandTemplate = secondResultCommand;
             saveConfiguration();
         }
 
         var notEnoughRoundPlayersResultText = configuration.TodSecondPairNotEnoughRoundPlayersResultText;
+        ImGui.TextDisabled("Not enough players text");
         ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputText("Not enough players text##Tod2Quick", ref notEnoughRoundPlayersResultText, 512))
+        if (ImGui.InputText("##Tod2QuickNotEnoughPlayers", ref notEnoughRoundPlayersResultText, 512))
         {
             configuration.TodSecondPairNotEnoughRoundPlayersResultText = notEnoughRoundPlayersResultText;
             saveConfiguration();
         }
 
         var notEnoughSecondPairText = configuration.TodSecondPairNotEnoughPlayersResultText;
+        ImGui.TextDisabled("Not enough second pair text");
         ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputText("Not enough second pair text##Tod2Quick", ref notEnoughSecondPairText, 512))
+        if (ImGui.InputText("##Tod2QuickNotEnoughSecondPair", ref notEnoughSecondPairText, 512))
         {
             configuration.TodSecondPairNotEnoughPlayersResultText = notEnoughSecondPairText;
             saveConfiguration();
