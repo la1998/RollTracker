@@ -16,6 +16,21 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.49", """
+            UI rework highlights:
+            - Added selectable Modern, Standard, and Legacy layouts.
+            - Added selectable themes: Dalamud Blue, Dalamud Night, Emerald, and Graphite.
+            - Added Advanced Mode for technical settings and line-delay controls.
+            - Added separate Roll History, Command Help, Chat Alias, and Changelog windows or tabs.
+            - Reworked Truth or Dare round controls with clearer Normal ToD and Double ToD sections.
+            - Added a Roll History window with roll count, highest roll, lowest roll, full table, and reset/end actions.
+            - Added managers for Truth prompts, Dare prompts, and Special Rule Sets.
+            - Special Rule Sets can be created, duplicated, renamed, deleted, enabled, and disabled.
+            - Reworked !help with Standard, Compact, and Advanced Macro Mode presets plus chat preview.
+            - Added configurable Chat Alias commands, including /rt on alias and /rt off alias.
+            - Renamed !wifi UI to Shell Infos and moved technical delays behind Advanced Mode.
+            - Added migration for old prompt lists and Special Rules into Set 1 while keeping existing saved config values.
+            """),
         new("0.1.0.48", "Testing update: UI rework with selectable layouts, themes, Roll History window, Command Help, Chat Alias, Advanced Mode, and Special Rule Sets."),
         new("0.1.0.47", "Stable metadata bump so stable keeps the Random! duplicate roll fix while testing stays one version ahead."),
         new("0.1.0.46", "Bug fix: /random chat lines that include a leading Random! label no longer count as a second player entry."),

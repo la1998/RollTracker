@@ -4,9 +4,9 @@
   "Name": "RollTracker",
   "InternalName": "RollTracker",
   "AssemblyVersion": "0.1.0.47",
-  "TestingAssemblyVersion": "0.1.0.48",
+  "TestingAssemblyVersion": "0.1.0.49",
   "TestingDalamudApiLevel": 15,
-  "TestingChangelog": "UI rework with selectable layouts, themes, Roll History window, Command Help, Chat Alias, Advanced Mode, and Special Rule Sets.",
+  "TestingChangelog": "UI rework highlights:\n- Added selectable Modern, Standard, and Legacy layouts.\n- Added selectable themes: Dalamud Blue, Dalamud Night, Emerald, and Graphite.\n- Added Advanced Mode for technical settings and line-delay controls.\n- Added separate Roll History, Command Help, Chat Alias, and Changelog windows or tabs.\n- Reworked Truth or Dare round controls with clearer Normal ToD and Double ToD sections.\n- Added a Roll History window with roll count, highest roll, lowest roll, full table, and reset/end actions.\n- Added managers for Truth prompts, Dare prompts, and Special Rule Sets.\n- Special Rule Sets can be created, duplicated, renamed, deleted, enabled, and disabled.\n- Reworked !help with Standard, Compact, and Advanced Macro Mode presets plus chat preview.\n- Added configurable Chat Alias commands, including /rt on alias and /rt off alias.\n- Renamed !wifi UI to Shell Infos and moved technical delays behind Advanced Mode.\n- Added migration for old prompt lists and Special Rules into Set 1 while keeping existing saved config values.",
   "Description": "Reads chat messages, detects /random rolls, tracks Truth or Dare rounds, and provides configurable !truth, !dare, !help, !tod2, and !wifi helpers.\n\nCommands:\n/rt - open or close the window.\n/rt help - show the full command and trigger list locally.",
   "ApplicableVersion": "any",
   "Tags": [
@@ -23,9 +23,9 @@
   "Punchline": "Tracks /random rolls for private round games.",
   "AcceptsFeedback": false,
   "DownloadLinkInstall": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
-  "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.48",
+  "DownloadLinkTesting": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/testing.zip?v=0.1.0.49",
   "DownloadLinkUpdate": "https://raw.githubusercontent.com/la1998/RollTracker/main/dist/RollTracker/latest.zip",
   "RepoUrl": "https://github.com/la1998/RollTracker",
-  "LastUpdate": "1788134073"
+  "LastUpdate": "1788134433"
 }
 ]
