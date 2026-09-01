@@ -2238,10 +2238,6 @@ internal sealed class MainWindow : Window, IDisposable
         {
             DrawCommandHelpLineEditor(id, legacyStyle);
         }
-        else
-        {
-            DrawCommandHelpPresetPreview();
-        }
     }
 
     private bool DrawHelpPresetCombo(string id)

@@ -13,471 +13,272 @@ internal sealed class ChangelogWindow : Window, IDisposable
     private static readonly Vector4 AccentColor = new(0.42f, 0.72f, 1.00f, 1.00f);
     private static readonly Vector4 SuccessColor = new(0.46f, 0.86f, 0.58f, 1.00f);
     private static readonly Vector4 PanelColor = new(0.08f, 0.10f, 0.11f, 0.92f);
-    private static readonly Version HistoryStartVersion = new(0, 1, 0, 53);
+    private static readonly Version HistoryStartVersion = new(0, 1, 0, 56);
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
-        new("0.1.0.56", """
-            Bug fixes and polish
-
-            Roll Tracking
-            - Fixed a critical issue where some combat/action log events, such as Chakra or other class abilities, could be detected as /random rolls.
+        new("0.1.0.57", """
+            Stable UI Rework Release
+            
+            Highlights
+            - Added a full UI rework with selectable layouts.
+            - Added selectable color themes for all layouts.
+            - Added Advanced Mode for technical and risky settings.
+            - Added separate Roll History, Command Help, Chat Alias, and Changelog windows/tabs.
+            - Added set management for Truth prompts, Dare prompts, and Special Rules.
+            - Added automatic config backup before plugin update migration.
+            
+            UI Layouts
+            - Added selectable Modern, Standard, and Legacy layouts.
+            - Modern uses a left sidebar navigation.
+            - Standard keeps the classic top tab navigation.
+            - Legacy keeps an original-style layout while supporting the new theme system.
+            - New installs now start with the Standard layout by default.
+            - Existing users keep their selected UI layout when updating.
+            
+            Themes
+            - Added selectable themes:
+              - Dalamud Blue
+              - Dalamud Night
+              - Emerald
+              - Graphite
+            - Legacy mode now also uses the selected theme colors.
+            
+            Truth Or Dare
+            - Reworked the main Truth or Dare controls for better spacing and readability.
+            - Added clearer Normal ToD Round and Double ToD Round sections.
+            - Added field labels for Macro, Result command, Not enough players text, and Not enough second pair text in Modern and Standard layouts.
+            - Added missing Not enough players text fields in Modern and Standard layouts.
+            - Added missing Double ToD fallback fields in Modern and Standard layouts.
+            - Added a separate !tod2 result line delay setting.
+            - Multi-line !tod2 result commands are now sent with a delay between lines.
+            - Fixed a critical issue where combat/action log events could be detected as /random rolls.
             - RollTracker now only tracks real RandomNumber log messages and normal /random chat output.
-
+            
+            Roll History
+            - Moved Roll History out of the main Truth or Dare page for Modern and Standard layouts.
+            - Added a separate Roll History window.
+            - Roll History shows roll count, highest roll, lowest roll, and the full roll table.
+            - Added high/low roll color feedback.
+            - Added Reset rolls and End round and post result actions to the Roll History window.
+            
             ToD Suggestions
+            - Renamed Truth / Dare to ToD Suggestions.
+            - Added a Sets Manager for Truth and Dare prompt sets.
+            - Prompt sets can be enabled or disabled from the Sets Manager.
+            - Added visual feedback for enabled and disabled sets.
+            - Removed the old per-set enabled checkbox from the edit area.
             - Improved the Sets Manager layout for small windows.
             - Added horizontal scrolling so the Sets Manager stays reachable when the window is narrow.
             - Removed the Prompts column from the Sets Manager table.
-            - Removed the duplicate prompt count above the Truth and Dare prompt lists.
+            - Removed duplicate prompt count text above Truth and Dare prompt lists.
             - Set names in the Sets Manager now wrap instead of being squeezed unreadably.
-
+            
+            Special Rules
+            - Added Special Rule Sets.
+            - Existing special rules are migrated into Set 1.
+            - Special Rule Sets can be created, duplicated, renamed, deleted, enabled, and disabled.
+            - Only enabled Special Rule Sets are checked when roll results are posted.
+            - Added a Special Rules Sets Manager in Modern, Standard, and Legacy layouts.
+            - Removed the old single-list-only Special Rules behavior from the UI.
+            - Moved Special rule line delay above the Special Rules table.
+            - Made the Special Rules line delay editable only in Advanced Mode.
+            - Added hover tooltips for Special Rules placeholders.
+            - Removed {role} from the visible placeholder hint list.
+            
             Command Help
+            - Reworked !help into its own Command Help tab.
+            - Added editable help text lines for the Standard preset.
             - Standard preset command triggers are now fixed and cannot be edited.
             - Only the help description text can be edited in the Standard preset.
-            - This prevents disabled modules from filtering the wrong help lines when command rows are changed.
-            - Fixed the Macro Mode tooltip when Advanced Mode is disabled.
-            - Fixed an issue where the line-delay tooltip could appear while hovering Macro Mode in the preset dropdown.
-            - Macro Mode now explains that Advanced Mode must be enabled to use it.
-
+            - !help now filters output by active and available modules again.
+            - Added Help presets:
+              - Standard
+              - Compact
+              - Macro Mode
+            - Added a real Chat Preview showing what would be sent to chat.
+            - Fixed duplicate Chat Preview display in Compact mode.
+            - Compact sends one line with command states.
+            - Macro Mode requires Advanced Mode.
+            - Added Macro Mode placeholders and segment filters.
+            - Macro Mode filters can now be used multiple times on the same line.
+            - Fixed Macro Mode tooltip behavior when Advanced Mode is disabled.
+            
+            Chat Alias
+            - Added a new Chat Alias tab.
+            - Added Enable chat alias toggle in Settings.
+            - Added configurable alias words.
+            - Added configurable alias commands.
+            - Each Chat Alias row can be edited, deleted, enabled, or disabled.
+            - Added /rt on alias and /rt off alias.
+            - Added Chat Alias to /rt status.
+            - Chat Alias is included in global enable/disable behavior.
+            - Auto-disable outside housing also disables Chat Alias.
+            
+            Shell Infos
+            - Renamed the old !wifi UI to Shell Infos.
+            - Kept Shell Infos macro editing and manual run action.
+            - Shell Infos line delay is now Advanced Mode only.
+            
+            Settings
+            - Reworked Settings layout.
+            - Kept module toggles centralized in Settings.
+            - Added Open Changelog button in Settings.
+            - Added Enable chat alias button in Settings.
+            - Settings action buttons now use a consistent fixed size.
+            - Settings action buttons no longer stretch across the full panel width.
+            
             Changelog
-            - Fixed manual changelog opening from Settings showing an empty changelog after the update popup had already been acknowledged.
-            - Added a changelog history view when opening the changelog manually from Settings.
-            - Changelog history starts with the current UI rework changelog and can include future versions.
-
+            - Added/reworked the Changelog window.
+            - Added a cleaner RollTracker-style changelog layout.
+            - Fixed manual changelog opening from Settings showing an empty changelog.
+            - Added changelog history view for current and future versions.
+            
             Config Backup
             - Before a new plugin version migrates or saves config values, RollTracker now writes one backup of the user's existing config.
             - The backup file is replaced on the next update instead of creating many old backup files.
             - The backup file uses the .bak suffix, for example RollTracker.json.bak.
-
-            Settings
-            - Made Settings action buttons use a consistent fixed size.
-            - Settings action buttons no longer stretch across the full panel width.
-
-            ToD Result Output
-            - Added a separate !tod2 result line delay setting.
-            - Multi-line !tod2 result commands are now sent with a delay between lines instead of all at once.
-            """),
-        new("0.1.0.55", """
-            Bug fixes and polish
-
-            Roll Tracking
-            - Fixed a critical issue where some combat/action log events, such as Chakra or other class abilities, could be detected as /random rolls.
-            - RollTracker now only tracks real RandomNumber log messages and normal /random chat output.
-
-            ToD Suggestions
-            - Improved the Sets Manager layout for small windows.
-            - Added horizontal scrolling so the Sets Manager stays reachable when the window is narrow.
-            - Removed the Prompts column from the Sets Manager table.
-            - Removed the duplicate prompt count above the Truth and Dare prompt lists.
-            - Set names in the Sets Manager now wrap instead of being squeezed unreadably.
-
-            Command Help
-            - Standard preset command triggers are now fixed and cannot be edited.
-            - Only the help description text can be edited in the Standard preset.
-            - This prevents disabled modules from filtering the wrong help lines when command rows are changed.
-            - Fixed the Macro Mode tooltip when Advanced Mode is disabled.
-            - Fixed an issue where the line-delay tooltip could appear while hovering Macro Mode in the preset dropdown.
-            - Macro Mode now explains that Advanced Mode must be enabled to use it.
-
-            Changelog
-            - Fixed manual changelog opening from Settings showing an empty changelog after the update popup had already been acknowledged.
-            - Added a changelog history view when opening the changelog manually from Settings.
-            - Changelog history starts with the current UI rework changelog and can include future versions.
-
-            Settings
-            - Made Settings action buttons use a consistent fixed size.
-            - Settings action buttons no longer stretch across the full panel width.
-
-            ToD Result Output
-            - Added a separate !tod2 result line delay setting.
-            - Multi-line !tod2 result commands are now sent with a delay between lines instead of all at once.
-            """),
-        new("0.1.0.54", """
-            Bug fixes and polish
-
-            Roll Tracking
-            - Fixed a critical issue where some combat/action log events, such as Chakra or other class abilities, could be detected as /random rolls.
-            - RollTracker now only tracks real RandomNumber log messages and normal /random chat output.
-
-            ToD Suggestions
-            - Improved the Sets Manager layout for small windows.
-            - Added horizontal scrolling so the Sets Manager stays reachable when the window is narrow.
-            - Removed the Prompts column from the Sets Manager table.
-            - Removed the duplicate prompt count above the Truth and Dare prompt lists.
-            - Set names in the Sets Manager now wrap instead of being squeezed unreadably.
-
-            Command Help
-            - Standard preset command triggers are now fixed and cannot be edited.
-            - Only the help description text can be edited in the Standard preset.
-            - This prevents disabled modules from filtering the wrong help lines when command rows are changed.
-            - Fixed the Macro Mode tooltip when Advanced Mode is disabled.
-            - Fixed an issue where the line-delay tooltip could appear while hovering Macro Mode in the preset dropdown.
-            - Macro Mode now explains that Advanced Mode must be enabled to use it.
-
-            Changelog
-            - Fixed manual changelog opening from Settings showing an empty changelog after the update popup had already been acknowledged.
-            - Added a changelog history view when opening the changelog manually from Settings.
-            - Changelog history starts with the current UI rework changelog and can include future versions.
-
-            Settings
-            - Made Settings action buttons use a consistent fixed size.
-            - Settings action buttons no longer stretch across the full panel width.
-
-            ToD Result Output
-            - Added a separate !tod2 result line delay setting.
-            - Multi-line !tod2 result commands are now sent with a delay between lines instead of all at once.
-            """),
-        new("0.1.0.53", """
-            Highlights
-            - Added a full UI rework with selectable layouts.
-            - Added selectable color themes for all layouts.
-            - Added a new Advanced Mode for risky or technical settings.
-            - Added separate Roll History, Command Help, Chat Alias, and Changelog windows/tabs.
-            - Added set management for Truth prompts, Dare prompts, and Special Rules.
-
-            UI Layouts
-            - Added a UI layout dropdown with three modes:
-              - Modern
-              - Standard
-              - Legacy
-            - Modern uses a left sidebar navigation.
-            - Standard keeps the classic top tab navigation.
-            - Legacy keeps an original-style layout while still supporting the newer theme system.
-            - Renamed Truth / Dare to ToD Suggestions.
-            - Renamed !wifi to Shell Infos.
-            - Added Command Help as its own module tab.
-            - Added Chat Alias as its own module tab.
-
-            Themes
-            - Added a UI theme dropdown.
-            - Added multiple themes:
-              - Dalamud Blue
-              - Dalamud Night
-              - Emerald
-              - Graphite
-            - Legacy mode now also uses the selected theme colors.
-
-            Truth Or Dare Round UI
-            - Reworked the main Truth or Dare controls for better spacing and readability.
-            - Renamed round sections:
-              - Normal ToD Round
-              - Double ToD Round
-            - Moved Roll History out of the main Truth or Dare page for Modern and Standard layouts.
-            - Added Open Roll History in the Round Info panel.
-            - Made the Round Info panel narrower so the main controls have more room.
-            - Added the Reset rolls and End round and post result actions to the Roll History window too.
-
-            Roll History Window
-            - Added a separate Roll History window.
-            - The Roll History window shows:
-              - current roll count
-              - highest roll
-              - lowest roll
-              - full roll table
-            - Added high/low roll color feedback.
-            - Added direct actions:
-              - Reset rolls
-              - End round and post result
-
-            ToD Suggestions
-            - Added a Sets Manager for Truth and Dare prompt sets.
-            - Prompt sets can be enabled or disabled from the Sets Manager by clicking the set name.
-            - Added visual feedback for enabled and disabled sets.
-            - Removed the per-set enabled checkbox from the edit area where the Sets Manager now handles that state.
-            - Legacy mode also has a compact Sets Manager for Truth and Dare sets.
-
-            Special Rules
-            - Added Special Rule Sets.
-            - Existing special rules are migrated into Set 1.
-            - Special Rule Sets can be:
-              - created
-              - duplicated
-              - renamed
-              - deleted
-              - enabled or disabled
-            - Only enabled Special Rule Sets are checked when roll results are posted.
-            - Added a Special Rules Sets Manager in Modern, Standard, and Legacy layouts.
-            - Removed the old single-list-only Special Rules behavior from the UI.
-            - Moved Special rule line delay (ms) above the Special Rules table.
-            - Made the Special Rules line delay editable only in Advanced Mode.
-            - Added hover tooltips for Special Rules placeholders:
-              - {player}
-              - {roll}
-            - Removed {role} from the visible placeholder hint list.
-
-            Command Help
-            - Reworked !help into its own Command Help tab.
-            - Added editable help text lines for the Standard preset.
-            - !help now again filters output by active/available modules.
-            - Added a Help preset dropdown:
-              - Standard
-              - Compact
-              - Macro Mode
-            - Added a real Chat Preview showing what would be sent to chat, including the selected chat command prefix.
-            - Compact sends one line with command states.
-            - Macro Mode requires Advanced Mode.
-            - Added Macro Mode placeholders:
-              - {activeCommands}
-              - {commandStates}
-            - Added Macro Mode segment filters:
-              - {!tod}
-              - {!tod2}
-              - {!truth}
-              - {!dare}
-              - {!wifi}
-            - Macro Mode filters can now be used multiple times on the same line.
-            - A disabled filter hides only the text segment until the next filter placeholder, instead of hiding the whole line.
-            - Added grey placeholder/example text inside the Macro Mode text box.
-            - The Macro Mode placeholder disappears as soon as the user types into the box.
-
-            Chat Alias
-            - Added a new Chat Alias tab.
-            - Added Enable chat alias toggle in Settings.
-            - Added configurable alias word, for example Rainbow, banane, or any custom word.
-            - Added a command dropdown with supported /rt commands.
-            - Added a custom typed-text field for each alias command.
-            - Added a table for configured Chat Alias commands.
-            - Each Chat Alias row can be edited, deleted, enabled, or disabled.
-            - Disabled Chat Alias rows stay saved but are ignored by chat detection.
-            - Added /rt on alias and /rt off alias.
-            - Added Chat Alias to /rt status.
-            - Chat Alias is included in global enable/disable behavior.
-            - Auto-disable outside housing also disables Chat Alias.
-
-            Advanced Mode
-            - Added Advanced Mode in Settings.
-            - Advanced Mode is enabled through a confirmation popup.
-            - Added warning text before enabling Advanced Mode.
-            - Added a button to turn Advanced Mode off again.
-            - Moved technical line-delay fields behind Advanced Mode.
-            - Line-delay fields stay visible in normal mode but are greyed out.
-            - Hovering disabled line-delay fields explains that Advanced Mode is needed.
-            - Advanced-only fields include Normal ToD, Double ToD, Special Rules, Shell Infos, and Command Help delay controls.
-
-            Shell Infos
-            - Renamed the old !wifi tab to Shell Infos.
-            - Kept Shell Infos macro editing and manual run action.
-            - Shell Infos line delay is now Advanced Mode only.
-
-            Settings
-            - Renamed Enable ToD Second pair to Enable ToD - Doubles.
-            - Kept module toggles centralized in Settings.
-            - Added Open Changelog button in Settings.
-            - Added Enable chat alias button in Settings.
-            - Put the !help chat channel control inside the Command Help tab.
-
-            Changelog Window
-            - Added/reworked the Changelog window.
-            - Added a cleaner RollTracker-style changelog layout.
-            - Added Open Changelog button in Settings.
-
+            
             Defaults And Migration
             - New default line delays are 1500 ms.
             - Existing saved line delay values are kept during migration.
-            - Migrates old prompt lists into prompt sets.
-            - Migrates old Special Rules into Special Rule Sets.
-            - Adds default help lines when missing.
-            - Validates saved Help preset values.
-            - Cleans invalid Chat Alias entries during config migration.
+            - Old prompt lists are migrated into prompt sets.
+            - Old Special Rules are migrated into Special Rule Sets.
+            - Missing default help lines are added automatically.
+            - Saved Help preset values are validated.
+            - Invalid Chat Alias entries are cleaned during config migration.
             """),
-        new("0.1.0.52", "Testing UI fix: Macro, Result command, Not enough players text, and Not enough second pair text now show matching field titles in the Modern and Standard Truth or Dare tab."),
-        new("0.1.0.51", """
-            Testing fixes
-            - Standard is now the default UI layout for new installs and migrated testing configs.
-            - The Truth or Dare tab now shows the normal ToD Not enough players text in Modern and Standard layouts.
-            - The Truth or Dare tab now shows both Double ToD fallback fields in Modern and Standard layouts:
-              - Not enough players text
-              - Not enough second pair text
-            """),
-        new("0.1.0.50", """
+        new("0.1.0.56", """
+            Stable UI Rework Release
+            
             Highlights
             - Added a full UI rework with selectable layouts.
             - Added selectable color themes for all layouts.
-            - Added a new Advanced Mode for risky or technical settings.
+            - Added Advanced Mode for technical and risky settings.
             - Added separate Roll History, Command Help, Chat Alias, and Changelog windows/tabs.
             - Added set management for Truth prompts, Dare prompts, and Special Rules.
-
+            - Added automatic config backup before plugin update migration.
+            
             UI Layouts
-            - Added a UI layout dropdown with three modes:
-              - Modern
-              - Standard
-              - Legacy
-            - Modern uses a left sidebar navigation.
-            - Standard keeps the classic top tab navigation.
-            - Legacy keeps an original-style layout while still supporting the newer theme system.
-            - Renamed Truth / Dare to ToD Suggestions.
-            - Renamed !wifi to Shell Infos.
-            - Added Command Help as its own module tab.
-            - Added Chat Alias as its own module tab.
-
-            Themes
-            - Added a UI theme dropdown.
-            - Added multiple themes:
-              - Dalamud Blue
-              - Dalamud Night
-              - Emerald
-              - Graphite
-            - Legacy mode now also uses the selected theme colors.
-
-            Truth Or Dare Round UI
-            - Reworked the main Truth or Dare controls for better spacing and readability.
-            - Renamed round sections:
-              - Normal ToD Round
-              - Double ToD Round
-            - Moved Roll History out of the main Truth or Dare page for Modern and Standard layouts.
-            - Added Open Roll History in the Round Info panel.
-            - Made the Round Info panel narrower so the main controls have more room.
-            - Added the Reset rolls and End round and post result actions to the Roll History window too.
-
-            Roll History Window
-            - Added a separate Roll History window.
-            - The Roll History window shows:
-              - current roll count
-              - highest roll
-              - lowest roll
-              - full roll table
-            - Added high/low roll color feedback.
-            - Added direct actions:
-              - Reset rolls
-              - End round and post result
-
-            ToD Suggestions
-            - Added a Sets Manager for Truth and Dare prompt sets.
-            - Prompt sets can be enabled or disabled from the Sets Manager by clicking the set name.
-            - Added visual feedback for enabled and disabled sets.
-            - Removed the per-set enabled checkbox from the edit area where the Sets Manager now handles that state.
-            - Legacy mode also has a compact Sets Manager for Truth and Dare sets.
-
-            Special Rules
-            - Added Special Rule Sets.
-            - Existing special rules are migrated into Set 1.
-            - Special Rule Sets can be:
-              - created
-              - duplicated
-              - renamed
-              - deleted
-              - enabled or disabled
-            - Only enabled Special Rule Sets are checked when roll results are posted.
-            - Added a Special Rules Sets Manager in Modern, Standard, and Legacy layouts.
-            - Removed the old single-list-only Special Rules behavior from the UI.
-            - Moved Special rule line delay (ms) above the Special Rules table.
-            - Made the Special Rules line delay editable only in Advanced Mode.
-            - Added hover tooltips for Special Rules placeholders:
-              - {player}
-              - {roll}
-            - Removed {role} from the visible placeholder hint list.
-
-            Command Help
-            - Reworked !help into its own Command Help tab.
-            - Added editable help text lines for the Standard preset.
-            - !help now again filters output by active/available modules.
-            - Added a Help preset dropdown:
-              - Standard
-              - Compact
-              - Macro Mode
-            - Added a real Chat Preview showing what would be sent to chat, including the selected chat command prefix.
-            - Compact sends one line with command states.
-            - Macro Mode requires Advanced Mode.
-            - Added Macro Mode placeholders:
-              - {activeCommands}
-              - {commandStates}
-            - Added Macro Mode segment filters:
-              - {!tod}
-              - {!tod2}
-              - {!truth}
-              - {!dare}
-              - {!wifi}
-            - Macro Mode filters can now be used multiple times on the same line.
-            - A disabled filter hides only the text segment until the next filter placeholder, instead of hiding the whole line.
-            - Added grey placeholder/example text inside the Macro Mode text box.
-            - The Macro Mode placeholder disappears as soon as the user types into the box.
-
-            Chat Alias
-            - Added a new Chat Alias tab.
-            - Added Enable chat alias toggle in Settings.
-            - Added configurable alias word, for example Rainbow, banane, or any custom word.
-            - Added a command dropdown with supported /rt commands.
-            - Added a custom typed-text field for each alias command.
-            - Added a table for configured Chat Alias commands.
-            - Each Chat Alias row can be edited, deleted, enabled, or disabled.
-            - Disabled Chat Alias rows stay saved but are ignored by chat detection.
-            - Added /rt on alias and /rt off alias.
-            - Added Chat Alias to /rt status.
-            - Chat Alias is included in global enable/disable behavior.
-            - Auto-disable outside housing also disables Chat Alias.
-
-            Advanced Mode
-            - Added Advanced Mode in Settings.
-            - Advanced Mode is enabled through a confirmation popup.
-            - Added warning text before enabling Advanced Mode.
-            - Added a button to turn Advanced Mode off again.
-            - Moved technical line-delay fields behind Advanced Mode.
-            - Line-delay fields stay visible in normal mode but are greyed out.
-            - Hovering disabled line-delay fields explains that Advanced Mode is needed.
-            - Advanced-only fields include Normal ToD, Double ToD, Special Rules, Shell Infos, and Command Help delay controls.
-
-            Shell Infos
-            - Renamed the old !wifi tab to Shell Infos.
-            - Kept Shell Infos macro editing and manual run action.
-            - Shell Infos line delay is now Advanced Mode only.
-
-            Settings
-            - Renamed Enable ToD Second pair to Enable ToD - Doubles.
-            - Kept module toggles centralized in Settings.
-            - Added Open Changelog button in Settings.
-            - Added Enable chat alias button in Settings.
-            - Put the !help chat channel control inside the Command Help tab.
-
-            Changelog Window
-            - Added/reworked the Changelog window.
-            - Added a cleaner RollTracker-style changelog layout.
-            - Added Open Changelog button in Settings.
-
-            Defaults And Migration
-            - New default line delays are 1500 ms.
-            - Existing saved line delay values are kept during migration.
-            - Migrates old prompt lists into prompt sets.
-            - Migrates old Special Rules into Special Rule Sets.
-            - Adds default help lines when missing.
-            - Validates saved Help preset values.
-            - Cleans invalid Chat Alias entries during config migration.
-            """),
-        new("0.1.0.49", """
-            UI rework highlights:
             - Added selectable Modern, Standard, and Legacy layouts.
-            - Added selectable themes: Dalamud Blue, Dalamud Night, Emerald, and Graphite.
-            - Added Advanced Mode for technical settings and line-delay controls.
-            - Added separate Roll History, Command Help, Chat Alias, and Changelog windows or tabs.
-            - Reworked Truth or Dare round controls with clearer Normal ToD and Double ToD sections.
-            - Added a Roll History window with roll count, highest roll, lowest roll, full table, and reset/end actions.
-            - Added managers for Truth prompts, Dare prompts, and Special Rule Sets.
+            - Modern uses a left sidebar navigation.
+            - Standard keeps the classic top tab navigation.
+            - Legacy keeps an original-style layout while supporting the new theme system.
+            - New installs now start with the Standard layout by default.
+            - Existing users keep their selected UI layout when updating.
+            
+            Themes
+            - Added selectable themes:
+              - Dalamud Blue
+              - Dalamud Night
+              - Emerald
+              - Graphite
+            - Legacy mode now also uses the selected theme colors.
+            
+            Truth Or Dare
+            - Reworked the main Truth or Dare controls for better spacing and readability.
+            - Added clearer Normal ToD Round and Double ToD Round sections.
+            - Added field labels for Macro, Result command, Not enough players text, and Not enough second pair text in Modern and Standard layouts.
+            - Added missing Not enough players text fields in Modern and Standard layouts.
+            - Added missing Double ToD fallback fields in Modern and Standard layouts.
+            - Added a separate !tod2 result line delay setting.
+            - Multi-line !tod2 result commands are now sent with a delay between lines.
+            - Fixed a critical issue where combat/action log events could be detected as /random rolls.
+            - RollTracker now only tracks real RandomNumber log messages and normal /random chat output.
+            
+            Roll History
+            - Moved Roll History out of the main Truth or Dare page for Modern and Standard layouts.
+            - Added a separate Roll History window.
+            - Roll History shows roll count, highest roll, lowest roll, and the full roll table.
+            - Added high/low roll color feedback.
+            - Added Reset rolls and End round and post result actions to the Roll History window.
+            
+            ToD Suggestions
+            - Renamed Truth / Dare to ToD Suggestions.
+            - Added a Sets Manager for Truth and Dare prompt sets.
+            - Prompt sets can be enabled or disabled from the Sets Manager.
+            - Added visual feedback for enabled and disabled sets.
+            - Removed the old per-set enabled checkbox from the edit area.
+            - Improved the Sets Manager layout for small windows.
+            - Added horizontal scrolling so the Sets Manager stays reachable when the window is narrow.
+            - Removed the Prompts column from the Sets Manager table.
+            - Removed duplicate prompt count text above Truth and Dare prompt lists.
+            - Set names in the Sets Manager now wrap instead of being squeezed unreadably.
+            
+            Special Rules
+            - Added Special Rule Sets.
+            - Existing special rules are migrated into Set 1.
             - Special Rule Sets can be created, duplicated, renamed, deleted, enabled, and disabled.
-            - Reworked !help with Standard, Compact, and Advanced Macro Mode presets plus chat preview.
-            - Added configurable Chat Alias commands, including /rt on alias and /rt off alias.
-            - Renamed !wifi UI to Shell Infos and moved technical delays behind Advanced Mode.
-            - Added migration for old prompt lists and Special Rules into Set 1 while keeping existing saved config values.
+            - Only enabled Special Rule Sets are checked when roll results are posted.
+            - Added a Special Rules Sets Manager in Modern, Standard, and Legacy layouts.
+            - Removed the old single-list-only Special Rules behavior from the UI.
+            - Moved Special rule line delay above the Special Rules table.
+            - Made the Special Rules line delay editable only in Advanced Mode.
+            - Added hover tooltips for Special Rules placeholders.
+            - Removed {role} from the visible placeholder hint list.
+            
+            Command Help
+            - Reworked !help into its own Command Help tab.
+            - Added editable help text lines for the Standard preset.
+            - Standard preset command triggers are now fixed and cannot be edited.
+            - Only the help description text can be edited in the Standard preset.
+            - !help now filters output by active and available modules again.
+            - Added Help presets:
+              - Standard
+              - Compact
+              - Macro Mode
+            - Added a real Chat Preview showing what would be sent to chat.
+            - Fixed duplicate Chat Preview display in Compact mode.
+            - Compact sends one line with command states.
+            - Macro Mode requires Advanced Mode.
+            - Added Macro Mode placeholders and segment filters.
+            - Macro Mode filters can now be used multiple times on the same line.
+            - Fixed Macro Mode tooltip behavior when Advanced Mode is disabled.
+            
+            Chat Alias
+            - Added a new Chat Alias tab.
+            - Added Enable chat alias toggle in Settings.
+            - Added configurable alias words.
+            - Added configurable alias commands.
+            - Each Chat Alias row can be edited, deleted, enabled, or disabled.
+            - Added /rt on alias and /rt off alias.
+            - Added Chat Alias to /rt status.
+            - Chat Alias is included in global enable/disable behavior.
+            - Auto-disable outside housing also disables Chat Alias.
+            
+            Shell Infos
+            - Renamed the old !wifi UI to Shell Infos.
+            - Kept Shell Infos macro editing and manual run action.
+            - Shell Infos line delay is now Advanced Mode only.
+            
+            Settings
+            - Reworked Settings layout.
+            - Kept module toggles centralized in Settings.
+            - Added Open Changelog button in Settings.
+            - Added Enable chat alias button in Settings.
+            - Settings action buttons now use a consistent fixed size.
+            - Settings action buttons no longer stretch across the full panel width.
+            
+            Changelog
+            - Added/reworked the Changelog window.
+            - Added a cleaner RollTracker-style changelog layout.
+            - Fixed manual changelog opening from Settings showing an empty changelog.
+            - Added changelog history view for current and future versions.
+            
+            Config Backup
+            - Before a new plugin version migrates or saves config values, RollTracker now writes one backup of the user's existing config.
+            - The backup file is replaced on the next update instead of creating many old backup files.
+            - The backup file uses the .bak suffix, for example RollTracker.json.bak.
+            
+            Defaults And Migration
+            - New default line delays are 1500 ms.
+            - Existing saved line delay values are kept during migration.
+            - Old prompt lists are migrated into prompt sets.
+            - Old Special Rules are migrated into Special Rule Sets.
+            - Missing default help lines are added automatically.
+            - Saved Help preset values are validated.
+            - Invalid Chat Alias entries are cleaned during config migration.
             """),
-        new("0.1.0.48", "Testing update: UI rework with selectable layouts, themes, Roll History window, Command Help, Chat Alias, Advanced Mode, and Special Rule Sets."),
-        new("0.1.0.47", "Stable metadata bump so stable keeps the Random! duplicate roll fix while testing stays one version ahead."),
-        new("0.1.0.46", "Bug fix: /random chat lines that include a leading Random! label no longer count as a second player entry."),
-        new("0.1.0.44", "Stable update: adds delayed help output, separate macro delays, /rt help, config folder support, not-enough-player result texts, Truth/Dare prompt sets, Special Rule fixes, and Special Rule result delay controls."),
-        new("0.1.0.43", "Testing update: separate !tod2 not-enough-player fallback, visible fallback commands, and delayed Special Rule result output."),
-        new("0.1.0.42", "Testing bug fix: config files now save readable Unicode symbols instead of escaped sequences."),
-        new("0.1.0.41", "Testing bug fix: RollTracker now stores and reads its active config from the plugin config folder."),
-        new("0.1.0.39", "Testing update: safer help output timing, separate macro line delays, local /rt help, config folder shortcut, too-few-player result texts, and Truth/Dare prompt sets."),
-        new("0.1.0.37", "Bug fix: default prompt and special rule lists no longer duplicate on future loads."),
-        new("0.1.0.36", "Bug fix: duplicate Truth, Dare, and Special Rule entries are cleaned up on load."),
-        new("0.1.0.35", "Bug fix: !truth and !dare now work from their own toggles even when ToD is off."),
-        new("0.1.0.34", "Polished the Settings tab with clearer sections."),
-        new("0.1.0.33", "Bug fix: Special Rules now check every roll in the round and the add form has one text field."),
-        new("0.1.0.32", "Bug fix: Special Rules now use Do not trigger with so custom rules are not hidden by 0/1 weighting."),
-        new("0.1.0.31", "Added repository cache-busting metadata for testing updates."),
-        new("0.1.0.27", "Added an editable Special Rules tab and sends special rule texts as separate chat messages."),
-        new("0.1.0.26", "Added this update changelog popup."),
-        new("0.1.0.25", "/rt on tod turns !truth and !dare on; /rt off tod leaves them unchanged."),
-        new("0.1.0.24", "Added /rt tod on and /rt tod off aliases."),
-        new("0.1.0.23", "Updated !tod2 defaults and sends first pair and second pair results as separate chat messages."),
-        new("0.1.0.22", "Added !help, independent !truth and !dare toggles, !tod2 rounds, and testing build metadata."),
     ];
 
     private readonly Configuration configuration;
@@ -716,19 +517,24 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
         if (!Version.TryParse(configuration.LastSeenChangelogVersion, out var lastSeenVersion))
         {
-            return Entries.Take(5);
+            return GetHistoryEntries().Take(5);
         }
 
         return Entries.Where(entry =>
             Version.TryParse(entry.Version, out var entryVersion) &&
+            Version.TryParse(currentVersion, out var currentEntryVersion) &&
+            entryVersion >= HistoryStartVersion &&
+            entryVersion <= currentEntryVersion &&
             entryVersion > lastSeenVersion);
     }
 
-    private static IEnumerable<ChangelogEntry> GetHistoryEntries()
+    private IEnumerable<ChangelogEntry> GetHistoryEntries()
     {
         return Entries.Where(entry =>
             Version.TryParse(entry.Version, out var entryVersion) &&
-            entryVersion >= HistoryStartVersion);
+            Version.TryParse(currentVersion, out var currentEntryVersion) &&
+            entryVersion >= HistoryStartVersion &&
+            entryVersion <= currentEntryVersion);
     }
 
     private void MarkSeenAndClose()
