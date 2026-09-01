@@ -21,7 +21,7 @@ To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's
 For local offline testing before publishing a GitHub testing build, see [LOCAL_DEV.md](LOCAL_DEV.md).
 
 Current stable: `0.1.0.47`
-Current testing: `0.1.0.55`
+Current testing: `0.1.0.56`
 
 ## Commands
 

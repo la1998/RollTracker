@@ -89,7 +89,9 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin()
     {
+        var currentVersion = GetPluginVersion();
         Configuration = LoadConfiguration();
+        BackupConfigurationBeforeUpdate(currentVersion);
         MigrateConfiguration();
         RollTrackerService = new RollTrackerService(
             ChatGui,
@@ -101,7 +103,7 @@ public sealed class Plugin : IDalamudPlugin
             Configuration,
             SaveConfiguration);
         RollHistoryWindow = new RollHistoryWindow(RollTrackerService);
-        ChangelogWindow = new ChangelogWindow(Configuration, SaveConfiguration, GetPluginVersion());
+        ChangelogWindow = new ChangelogWindow(Configuration, SaveConfiguration, currentVersion);
         MainWindow = new MainWindow(
             RollTrackerService,
             Configuration,
@@ -396,6 +398,32 @@ public sealed class Plugin : IDalamudPlugin
     private static string GetPluginConfigFilePath()
     {
         return Path.Combine(PluginInterface.GetPluginConfigDirectory(), PluginInterface.ConfigFile.Name);
+    }
+
+    private void BackupConfigurationBeforeUpdate(string currentVersion)
+    {
+        try
+        {
+            var configFile = GetPluginConfigFilePath();
+            if (!File.Exists(configFile) ||
+                string.Equals(Configuration.LastConfigBackupVersion, currentVersion, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var configDirectory = Path.GetDirectoryName(configFile) ?? PluginInterface.GetPluginConfigDirectory();
+            var backupFile = Path.Combine(configDirectory, $"{Path.GetFileName(configFile)}.bak");
+
+            File.Copy(configFile, backupFile, overwrite: true);
+            Configuration.LastConfigBackupVersion = currentVersion;
+            SaveConfiguration();
+            Log.Information("Backed up RollTracker config before update to {Version}: {BackupFile}", currentVersion, backupFile);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to back up RollTracker config before update.");
+            ChatGui.PrintError($"Could not back up RollTracker config before update: {ex.Message}", "RollTracker");
+        }
     }
 
     private void MigrateConfiguration()

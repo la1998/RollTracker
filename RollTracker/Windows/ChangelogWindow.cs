@@ -17,6 +17,46 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.56", """
+            Bug fixes and polish
+
+            Roll Tracking
+            - Fixed a critical issue where some combat/action log events, such as Chakra or other class abilities, could be detected as /random rolls.
+            - RollTracker now only tracks real RandomNumber log messages and normal /random chat output.
+
+            ToD Suggestions
+            - Improved the Sets Manager layout for small windows.
+            - Added horizontal scrolling so the Sets Manager stays reachable when the window is narrow.
+            - Removed the Prompts column from the Sets Manager table.
+            - Removed the duplicate prompt count above the Truth and Dare prompt lists.
+            - Set names in the Sets Manager now wrap instead of being squeezed unreadably.
+
+            Command Help
+            - Standard preset command triggers are now fixed and cannot be edited.
+            - Only the help description text can be edited in the Standard preset.
+            - This prevents disabled modules from filtering the wrong help lines when command rows are changed.
+            - Fixed the Macro Mode tooltip when Advanced Mode is disabled.
+            - Fixed an issue where the line-delay tooltip could appear while hovering Macro Mode in the preset dropdown.
+            - Macro Mode now explains that Advanced Mode must be enabled to use it.
+
+            Changelog
+            - Fixed manual changelog opening from Settings showing an empty changelog after the update popup had already been acknowledged.
+            - Added a changelog history view when opening the changelog manually from Settings.
+            - Changelog history starts with the current UI rework changelog and can include future versions.
+
+            Config Backup
+            - Before a new plugin version migrates or saves config values, RollTracker now writes one backup of the user's existing config.
+            - The backup file is replaced on the next update instead of creating many old backup files.
+            - The backup file uses the .bak suffix, for example RollTracker.json.bak.
+
+            Settings
+            - Made Settings action buttons use a consistent fixed size.
+            - Settings action buttons no longer stretch across the full panel width.
+
+            ToD Result Output
+            - Added a separate !tod2 result line delay setting.
+            - Multi-line !tod2 result commands are now sent with a delay between lines instead of all at once.
+            """),
         new("0.1.0.55", """
             Bug fixes and polish
 
