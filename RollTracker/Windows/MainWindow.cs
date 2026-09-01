@@ -46,28 +46,38 @@ internal sealed class MainWindow : Window, IDisposable
         "!dare",
         "!wifi",
     ];
+    private const float TodMacroInputHeight = 132f;
     private static readonly Vector2 SettingsButtonSize = new(190, 0);
 
     private static readonly (string Label, string Args)[] ChatAliasCommandOptions =
     [
         ("/rt on", "on"),
         ("/rt off", "off"),
-        ("/rt on tod", "on tod"),
-        ("/rt off tod", "off tod"),
-        ("/rt on todsecond", "on todsecond"),
-        ("/rt off todsecond", "off todsecond"),
-        ("/rt on todrules", "on todrules"),
-        ("/rt off todrules", "off todrules"),
-        ("/rt on truth", "on truth"),
-        ("/rt off truth", "off truth"),
-        ("/rt on dare", "on dare"),
-        ("/rt off dare", "off dare"),
-        ("/rt on help", "on help"),
-        ("/rt off help", "off help"),
-        ("/rt on alias", "on alias"),
-        ("/rt off alias", "off alias"),
-        ("/rt on wifi", "on wifi"),
-        ("/rt off wifi", "off wifi"),
+        ("/rt toggle", "toggle"),
+        ("/rt tod on", "tod on"),
+        ("/rt tod off", "tod off"),
+        ("/rt tod toggle", "tod toggle"),
+        ("/rt todsecond on", "todsecond on"),
+        ("/rt todsecond off", "todsecond off"),
+        ("/rt todsecond toggle", "todsecond toggle"),
+        ("/rt todrules on", "todrules on"),
+        ("/rt todrules off", "todrules off"),
+        ("/rt todrules toggle", "todrules toggle"),
+        ("/rt truth on", "truth on"),
+        ("/rt truth off", "truth off"),
+        ("/rt truth toggle", "truth toggle"),
+        ("/rt dare on", "dare on"),
+        ("/rt dare off", "dare off"),
+        ("/rt dare toggle", "dare toggle"),
+        ("/rt help on", "help on"),
+        ("/rt help off", "help off"),
+        ("/rt help toggle", "help toggle"),
+        ("/rt alias on", "alias on"),
+        ("/rt alias off", "alias off"),
+        ("/rt alias toggle", "alias toggle"),
+        ("/rt wifi on", "wifi on"),
+        ("/rt wifi off", "wifi off"),
+        ("/rt wifi toggle", "wifi toggle"),
         ("/rt reset", "reset"),
         ("/rt end", "end"),
         ("/rt test", "test"),
@@ -244,6 +254,8 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.EndTabItem();
         }
 
+        DrawAutoOffTabItem();
+
         if (ImGui.BeginTabItem("Settings"))
         {
             DrawSettingsTab();
@@ -296,6 +308,8 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.EndTabItem();
         }
 
+        DrawAutoOffTabItem();
+
         if (ImGui.BeginTabItem("Settings"))
         {
             DrawLegacySettingsTab();
@@ -303,6 +317,26 @@ internal sealed class MainWindow : Window, IDisposable
         }
 
         ImGui.EndTabBar();
+    }
+
+    private void DrawAutoOffTabItem()
+    {
+        if (!configuration.AdvancedMode)
+        {
+            ImGui.BeginDisabled();
+        }
+
+        if (ImGui.BeginTabItem("Auto Off"))
+        {
+            DrawAutoOffTab();
+            ImGui.EndTabItem();
+        }
+
+        if (!configuration.AdvancedMode)
+        {
+            ImGui.EndDisabled();
+            DrawAdvancedModeOnlyTooltip("Enable Advanced mode in Settings to use Auto Off settings.");
+        }
     }
 
     private void DrawSidebar()
@@ -318,6 +352,7 @@ internal sealed class MainWindow : Window, IDisposable
         DrawNavButton(Page.CommandHelp, "Command Help");
         DrawNavButton(Page.ChatAlias, "Chat Alias");
         DrawNavButton(Page.Wifi, "Shell Infos");
+        DrawNavButton(Page.AutoOff, "Auto Off", configuration.AdvancedMode);
 
         var bottomButtonHeight = ImGui.GetFrameHeightWithSpacing() + ImGui.GetStyle().ItemSpacing.Y + 2 * ImGuiHelpers.GlobalScale;
         var remainingHeight = ImGui.GetContentRegionAvail().Y - bottomButtonHeight;
@@ -330,9 +365,14 @@ internal sealed class MainWindow : Window, IDisposable
         DrawNavButton(Page.Settings, "Settings");
     }
 
-    private void DrawNavButton(Page page, string label)
+    private void DrawNavButton(Page page, string label, bool enabled = true)
     {
         var active = selectedPage == page;
+        if (!enabled)
+        {
+            ImGui.BeginDisabled();
+        }
+
         if (active)
         {
             ImGui.PushStyleColor(ImGuiCol.Button, ButtonColor);
@@ -352,6 +392,11 @@ internal sealed class MainWindow : Window, IDisposable
         }
 
         ImGui.PopStyleColor(3);
+        if (!enabled)
+        {
+            ImGui.EndDisabled();
+            DrawAdvancedModeOnlyTooltip("Enable Advanced mode in Settings to use Auto Off settings.");
+        }
     }
 
     private void DrawSelectedPage()
@@ -376,6 +421,17 @@ internal sealed class MainWindow : Window, IDisposable
             case Page.Wifi:
                 DrawWifiTab();
                 break;
+            case Page.AutoOff:
+                if (configuration.AdvancedMode)
+                {
+                    DrawAutoOffTab();
+                }
+                else
+                {
+                    selectedPage = Page.Settings;
+                    DrawSettingsTab();
+                }
+                break;
             case Page.Settings:
                 DrawSettingsTab();
                 break;
@@ -392,6 +448,7 @@ internal sealed class MainWindow : Window, IDisposable
             Page.CommandHelp => "Command Help",
             Page.ChatAlias => "Chat Alias",
             Page.Wifi => "Shell Infos",
+            Page.AutoOff => "Auto Off",
             Page.Settings => "Settings",
             _ => "RollTracker",
         };
@@ -489,8 +546,7 @@ internal sealed class MainWindow : Window, IDisposable
 
         var macroText = configuration.MacroText;
         ImGui.TextDisabled("Macro");
-        ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputTextMultiline("##TodMacroText", ref macroText, 4096, new Vector2(0, 64 * ImGuiHelpers.GlobalScale)))
+        if (DrawTodMacroInput("##TodMacroText", ref macroText))
         {
             configuration.MacroText = macroText;
             saveConfiguration();
@@ -532,8 +588,7 @@ internal sealed class MainWindow : Window, IDisposable
 
         var secondMacroText = configuration.TodSecondPairMacroText;
         ImGui.TextDisabled("Macro");
-        ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputTextMultiline("##Tod2MacroText", ref secondMacroText, 4096, new Vector2(0, 64 * ImGuiHelpers.GlobalScale)))
+        if (DrawTodMacroInput("##Tod2MacroText", ref secondMacroText))
         {
             configuration.TodSecondPairMacroText = secondMacroText;
             saveConfiguration();
@@ -623,8 +678,7 @@ internal sealed class MainWindow : Window, IDisposable
         configuration.MacroLineDelayMilliseconds = lineDelayMilliseconds;
 
         var macroText = configuration.MacroText;
-        ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputTextMultiline("Macro##Tod", ref macroText, 4096, new Vector2(0, 90 * ImGuiHelpers.GlobalScale)))
+        if (DrawTodMacroInput("Macro##Tod", ref macroText))
         {
             configuration.MacroText = macroText;
             saveConfiguration();
@@ -891,13 +945,7 @@ internal sealed class MainWindow : Window, IDisposable
         DrawSettingsSection("General");
         DrawModuleToggle("Enable !help", configuration.HelpTriggerEnabled, rollTrackerService.SetHelpTriggerEnabled);
         DrawModuleToggle("Enable chat alias", configuration.ChatAliasEnabled, rollTrackerService.SetChatAliasEnabled);
-
-        var autoDisableWhenLeavingHousing = configuration.AutoDisableWhenLeavingHousing;
-        if (ImGui.Checkbox("Auto off outside house", ref autoDisableWhenLeavingHousing))
-        {
-            configuration.AutoDisableWhenLeavingHousing = autoDisableWhenLeavingHousing;
-            saveConfiguration();
-        }
+        DrawChatAliasWakeToggle();
 
         if (DrawSettingsButton("Open config folder"))
         {
@@ -909,6 +957,9 @@ internal sealed class MainWindow : Window, IDisposable
 
         DrawSettingsSection("Wifi");
         DrawModuleToggle("Enable Wifi", configuration.WifiEnabled, rollTrackerService.SetWifiEnabled);
+
+        DrawSettingsSection("Auto Off");
+        DrawAutoOffSettingsSummary();
 
         DrawSettingsSection("Global");
         if (DrawSettingsButton("Enable all"))
@@ -1165,8 +1216,7 @@ internal sealed class MainWindow : Window, IDisposable
         configuration.TodSecondPairMacroLineDelayMilliseconds = lineDelayMilliseconds;
 
         var macroText = configuration.TodSecondPairMacroText;
-        ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputTextMultiline("Macro##Tod2", ref macroText, 4096, new Vector2(0, 90 * ImGuiHelpers.GlobalScale)))
+        if (DrawTodMacroInput("Macro##Tod2", ref macroText))
         {
             configuration.TodSecondPairMacroText = macroText;
             saveConfiguration();
@@ -1196,6 +1246,33 @@ internal sealed class MainWindow : Window, IDisposable
             configuration.TodSecondPairNotEnoughPlayersResultText = notEnoughPlayersResultText;
             saveConfiguration();
         }
+    }
+
+    private static bool DrawTodMacroInput(string label, ref string macroText)
+    {
+        var scale = ImGuiHelpers.GlobalScale;
+        var visibleWidth = ImGui.GetContentRegionAvail().X;
+        var contentWidth = Math.Max(760 * scale, visibleWidth);
+        var childHeight = (TodMacroInputHeight + 22) * scale;
+        var id = label.Contains("##", StringComparison.Ordinal)
+            ? label[(label.IndexOf("##", StringComparison.Ordinal) + 2)..]
+            : label;
+
+        ImGui.SetNextWindowContentSize(new Vector2(contentWidth, 0));
+        if (!ImGui.BeginChild(
+            $"##{id}HorizontalScroll",
+            new Vector2(0, childHeight),
+            false,
+            ImGuiWindowFlags.HorizontalScrollbar))
+        {
+            ImGui.EndChild();
+            return false;
+        }
+
+        ImGui.SetNextItemWidth(contentWidth);
+        var changed = ImGui.InputTextMultiline(label, ref macroText, 4096, new Vector2(contentWidth, TodMacroInputHeight * scale));
+        ImGui.EndChild();
+        return changed;
     }
 
     private void DrawTimingInputs(string id, ref int durationSeconds, ref int lineDelayMilliseconds)
@@ -1756,7 +1833,7 @@ internal sealed class MainWindow : Window, IDisposable
     private void DrawSpecialRuleTable(string id, List<TodSpecialRule> rules, bool legacyStyle)
     {
         var tableFlags = (legacyStyle ? ImGuiTableFlags.Borders : ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.ScrollY) |
-                         ImGuiTableFlags.RowBg |
+                         ImGuiTableFlags.Resizable |
                          ImGuiTableFlags.SizingStretchProp;
         var tableSize = legacyStyle
             ? Vector2.Zero
@@ -1891,7 +1968,7 @@ internal sealed class MainWindow : Window, IDisposable
             BeginPanel("Sets Manager", size);
         }
 
-        if (ImGui.BeginTable($"RollTracker{(legacyStyle ? "Legacy" : "Modern")}SpecialRuleSetManagerTable", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchProp))
+        if (ImGui.BeginTable($"RollTracker{(legacyStyle ? "Legacy" : "Modern")}SpecialRuleSetManagerTable", 3, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp))
         {
             ImGui.TableSetupColumn("Set Name");
             ImGui.TableSetupColumn("State", ImGuiTableColumnFlags.WidthFixed, 48 * ImGuiHelpers.GlobalScale);
@@ -2022,6 +2099,217 @@ internal sealed class MainWindow : Window, IDisposable
         EndPanel();
     }
 
+    private void DrawAutoOffTab()
+    {
+        BeginPanel("Auto Off", Vector2.Zero);
+        DrawSectionTitle("Triggers");
+        var disableOnLeavingHousingInterior = configuration.AutoDisableOnLeavingHousingInterior;
+        if (DrawAutoOffTriggerCheckbox("Leaving house interior", ref disableOnLeavingHousingInterior))
+        {
+            configuration.AutoDisableOnLeavingHousingInterior = disableOnLeavingHousingInterior;
+            saveConfiguration();
+        }
+
+        var disableOnEnteringHousingInterior = configuration.AutoDisableOnEnteringHousingInterior;
+        if (DrawAutoOffTriggerCheckbox("Entering house interior", ref disableOnEnteringHousingInterior))
+        {
+            configuration.AutoDisableOnEnteringHousingInterior = disableOnEnteringHousingInterior;
+            saveConfiguration();
+        }
+
+        var disableOnLeavingResidentialArea = configuration.AutoDisableOnLeavingResidentialArea;
+        if (DrawAutoOffTriggerCheckbox("Leaving residential area", ref disableOnLeavingResidentialArea))
+        {
+            configuration.AutoDisableOnLeavingResidentialArea = disableOnLeavingResidentialArea;
+            saveConfiguration();
+        }
+
+        var disableOnTerritoryChange = configuration.AutoDisableOnTerritoryChange;
+        if (DrawAutoOffTriggerCheckbox("Teleport / zone change", ref disableOnTerritoryChange))
+        {
+            configuration.AutoDisableOnTerritoryChange = disableOnTerritoryChange;
+            saveConfiguration();
+        }
+
+        ImGui.Spacing();
+        DrawSectionTitle("Affected modules");
+        DrawAutoOffAffectedModules();
+
+        ImGui.Spacing();
+        DrawSectionTitle("Current behavior");
+        ImGui.TextColored(configuration.AutoDisableWhenLeavingHousing ? SuccessColor : MutedColor, configuration.AutoDisableWhenLeavingHousing ? "Auto Off enabled" : "Auto Off disabled");
+        ImGui.TextDisabled(GetAutoOffSummaryText());
+        ImGui.TextDisabled(GetAutoOffAffectedModulesText());
+        EndPanel();
+    }
+
+    private void DrawAutoOffAffectedModules()
+    {
+        var affectsTod = configuration.AutoDisableAffectsTod;
+        if (DrawAutoOffTriggerCheckbox("ToD", ref affectsTod))
+        {
+            configuration.AutoDisableAffectsTod = affectsTod;
+            saveConfiguration();
+        }
+
+        var affectsTodSecondPair = configuration.AutoDisableAffectsTodSecondPair;
+        if (DrawAutoOffTriggerCheckbox("ToD - Doubles", ref affectsTodSecondPair))
+        {
+            configuration.AutoDisableAffectsTodSecondPair = affectsTodSecondPair;
+            saveConfiguration();
+        }
+
+        var affectsTodSpecialRules = configuration.AutoDisableAffectsTodSpecialRules;
+        if (DrawAutoOffTriggerCheckbox("ToD special rules", ref affectsTodSpecialRules))
+        {
+            configuration.AutoDisableAffectsTodSpecialRules = affectsTodSpecialRules;
+            saveConfiguration();
+        }
+
+        var affectsTruth = configuration.AutoDisableAffectsTruth;
+        if (DrawAutoOffTriggerCheckbox("!truth", ref affectsTruth))
+        {
+            configuration.AutoDisableAffectsTruth = affectsTruth;
+            saveConfiguration();
+        }
+
+        var affectsDare = configuration.AutoDisableAffectsDare;
+        if (DrawAutoOffTriggerCheckbox("!dare", ref affectsDare))
+        {
+            configuration.AutoDisableAffectsDare = affectsDare;
+            saveConfiguration();
+        }
+
+        var affectsHelp = configuration.AutoDisableAffectsHelp;
+        if (DrawAutoOffTriggerCheckbox("!help", ref affectsHelp))
+        {
+            configuration.AutoDisableAffectsHelp = affectsHelp;
+            saveConfiguration();
+        }
+
+        var affectsChatAlias = configuration.AutoDisableAffectsChatAlias;
+        if (DrawAutoOffTriggerCheckbox("Chat Alias", ref affectsChatAlias))
+        {
+            configuration.AutoDisableAffectsChatAlias = affectsChatAlias;
+            saveConfiguration();
+        }
+
+        var affectsWifi = configuration.AutoDisableAffectsWifi;
+        if (DrawAutoOffTriggerCheckbox("!wifi", ref affectsWifi))
+        {
+            configuration.AutoDisableAffectsWifi = affectsWifi;
+            saveConfiguration();
+        }
+    }
+
+    private void DrawAutoOffSettingsSummary()
+    {
+        DrawAutoOffMasterCheckbox("Enable Auto Off");
+    }
+
+    private void DrawChatAliasWakeToggle()
+    {
+        var allowEnableWhenDisabled = configuration.ChatAliasAllowEnableWhenDisabled;
+        if (ImGui.Checkbox("Allow enable/toggle aliases while Chat Alias is off", ref allowEnableWhenDisabled))
+        {
+            configuration.ChatAliasAllowEnableWhenDisabled = allowEnableWhenDisabled;
+            saveConfiguration();
+        }
+
+        DrawHelpTooltip("Allows configured aliases that run /rt on, /rt toggle, /rt alias on, or /rt alias toggle to work even when Chat Alias is currently disabled.");
+    }
+
+    private void DrawAutoOffMasterCheckbox(string label)
+    {
+        var autoDisableWhenLeavingHousing = configuration.AutoDisableWhenLeavingHousing;
+        if (ImGui.Checkbox(label, ref autoDisableWhenLeavingHousing))
+        {
+            configuration.AutoDisableWhenLeavingHousing = autoDisableWhenLeavingHousing;
+            saveConfiguration();
+        }
+    }
+
+    private static bool DrawAutoOffTriggerCheckbox(string label, ref bool enabled)
+    {
+        return ImGui.Checkbox(label, ref enabled);
+    }
+
+    private string GetAutoOffSummaryText()
+    {
+        var triggers = new List<string>();
+        if (configuration.AutoDisableOnLeavingHousingInterior)
+        {
+            triggers.Add("house interior");
+        }
+
+        if (configuration.AutoDisableOnEnteringHousingInterior)
+        {
+            triggers.Add("entering house interior");
+        }
+
+        if (configuration.AutoDisableOnLeavingResidentialArea)
+        {
+            triggers.Add("residential area");
+        }
+
+        if (configuration.AutoDisableOnTerritoryChange)
+        {
+            triggers.Add("teleport / zone change");
+        }
+
+        return triggers.Count == 0
+            ? "No trigger selected"
+            : $"Triggers: {string.Join(", ", triggers)}";
+    }
+
+    private string GetAutoOffAffectedModulesText()
+    {
+        var modules = new List<string>();
+        if (configuration.AutoDisableAffectsTod)
+        {
+            modules.Add("ToD");
+        }
+
+        if (configuration.AutoDisableAffectsTodSecondPair)
+        {
+            modules.Add("ToD - Doubles");
+        }
+
+        if (configuration.AutoDisableAffectsTodSpecialRules)
+        {
+            modules.Add("ToD special rules");
+        }
+
+        if (configuration.AutoDisableAffectsTruth)
+        {
+            modules.Add("!truth");
+        }
+
+        if (configuration.AutoDisableAffectsDare)
+        {
+            modules.Add("!dare");
+        }
+
+        if (configuration.AutoDisableAffectsHelp)
+        {
+            modules.Add("!help");
+        }
+
+        if (configuration.AutoDisableAffectsChatAlias)
+        {
+            modules.Add("Chat Alias");
+        }
+
+        if (configuration.AutoDisableAffectsWifi)
+        {
+            modules.Add("!wifi");
+        }
+
+        return modules.Count == 0
+            ? "Affected modules: none"
+            : $"Affected modules: {string.Join(", ", modules)}";
+    }
+
     private void DrawChatAliasContent(string id, bool legacyStyle)
     {
         configuration.ChatAliasCommands ??= [];
@@ -2034,6 +2322,10 @@ internal sealed class MainWindow : Window, IDisposable
             saveConfiguration();
         }
         DrawHelpTooltip("Players must type this word before the alias command text.");
+
+        ImGui.SameLine();
+        DrawChatChannelCombo("Feedback chat", configuration.ChatAliasFeedbackChatChannel, channel => configuration.ChatAliasFeedbackChatChannel = channel);
+        DrawHelpTooltip("Alias rows with Feedback enabled send their status message to this chat channel.");
 
         ImGui.Spacing();
         DrawChatAliasAddRow(id);
@@ -2097,13 +2389,13 @@ internal sealed class MainWindow : Window, IDisposable
     private void DrawChatAliasCommandTable(string id, bool legacyStyle)
     {
         var tableFlags = (legacyStyle ? ImGuiTableFlags.Borders : ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.ScrollY) |
-                         ImGuiTableFlags.RowBg |
+                         ImGuiTableFlags.Resizable |
                          ImGuiTableFlags.SizingStretchProp;
         var tableSize = legacyStyle
             ? Vector2.Zero
             : new Vector2(0, Math.Max(190 * ImGuiHelpers.GlobalScale, ImGui.GetContentRegionAvail().Y - 36 * ImGuiHelpers.GlobalScale));
 
-        if (!ImGui.BeginTable($"RollTracker{id}ChatAliasTable", 5, tableFlags, tableSize))
+        if (!ImGui.BeginTable($"RollTracker{id}ChatAliasTable", 6, tableFlags, tableSize))
         {
             return;
         }
@@ -2111,6 +2403,7 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.TableSetupColumn("On", ImGuiTableColumnFlags.WidthFixed, 42 * ImGuiHelpers.GlobalScale);
         ImGui.TableSetupColumn("Chat input");
         ImGui.TableSetupColumn("Runs");
+        ImGui.TableSetupColumn("Feedback", ImGuiTableColumnFlags.WidthFixed, 72 * ImGuiHelpers.GlobalScale);
         ImGui.TableSetupColumn("Preview");
         ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 82 * ImGuiHelpers.GlobalScale);
         ImGui.TableHeadersRow();
@@ -2141,7 +2434,7 @@ internal sealed class MainWindow : Window, IDisposable
             }
 
             ImGui.TableNextColumn();
-            var selectedIndex = Math.Max(0, Array.FindIndex(ChatAliasCommandOptions, option => option.Args.Equals(aliasCommand.RtCommandArgs, StringComparison.Ordinal)));
+            var selectedIndex = GetChatAliasCommandOptionIndex(aliasCommand.RtCommandArgs);
             var selectedLabel = ChatAliasCommandOptions[selectedIndex].Label;
             ImGui.SetNextItemWidth(-1);
             if (ImGui.BeginCombo("##Command", selectedLabel))
@@ -2161,10 +2454,23 @@ internal sealed class MainWindow : Window, IDisposable
             }
 
             ImGui.TableNextColumn();
+            var feedbackEnabled = aliasCommand.FeedbackEnabled;
+            if (ImGui.Checkbox("##Feedback", ref feedbackEnabled))
+            {
+                aliasCommand.FeedbackEnabled = feedbackEnabled;
+                configuration.ChatAliasCommands[i] = aliasCommand;
+                saveConfiguration();
+            }
+
+            ImGui.TableNextColumn();
             var previewColor = aliasCommand.Enabled ? AccentColor : MutedColor;
             ImGui.TextColored(previewColor, aliasCommand.Enabled ? "Enabled" : "Disabled");
             ImGui.TextWrapped($"Player: {configuration.ChatAliasWord.Trim()} {aliasCommand.TriggerText}");
-            ImGui.TextWrapped($"You: /rt {aliasCommand.RtCommandArgs}");
+            ImGui.TextWrapped($"You: /rt {GetDisplayChatAliasCommandArgs(aliasCommand.RtCommandArgs)}");
+            if (aliasCommand.FeedbackEnabled)
+            {
+                ImGui.TextWrapped($"Feedback: {GetChatCommand(configuration.ChatAliasFeedbackChatChannel)} status message");
+            }
 
             ImGui.TableNextColumn();
             if (ImGui.Button("Delete", new Vector2(-1, 0)))
@@ -2180,6 +2486,56 @@ internal sealed class MainWindow : Window, IDisposable
         }
 
         ImGui.EndTable();
+    }
+
+    private static int GetChatAliasCommandOptionIndex(string args)
+    {
+        var displayArgs = GetDisplayChatAliasCommandArgs(args);
+        var selectedIndex = Array.FindIndex(
+            ChatAliasCommandOptions,
+            option => option.Args.Equals(displayArgs, StringComparison.Ordinal));
+        return Math.Max(0, selectedIndex);
+    }
+
+    private static string GetDisplayChatAliasCommandArgs(string args)
+    {
+        return args.Trim().ToLowerInvariant() switch
+        {
+            "on tod" => "tod on",
+            "off tod" => "tod off",
+            "on todsecond" => "todsecond on",
+            "off todsecond" => "todsecond off",
+            "on todrules" => "todrules on",
+            "off todrules" => "todrules off",
+            "on truth" => "truth on",
+            "off truth" => "truth off",
+            "on dare" => "dare on",
+            "off dare" => "dare off",
+            "on help" => "help on",
+            "off help" => "help off",
+            "on alias" => "alias on",
+            "off alias" => "alias off",
+            "on wifi" => "wifi on",
+            "off wifi" => "wifi off",
+            "toggle tod" => "tod toggle",
+            "toggel tod" => "tod toggle",
+            "toggle todsecond" => "todsecond toggle",
+            "toggel todsecond" => "todsecond toggle",
+            "toggle todrules" => "todrules toggle",
+            "toggel todrules" => "todrules toggle",
+            "toggle truth" => "truth toggle",
+            "toggel truth" => "truth toggle",
+            "toggle dare" => "dare toggle",
+            "toggel dare" => "dare toggle",
+            "toggle help" => "help toggle",
+            "toggel help" => "help toggle",
+            "toggle alias" => "alias toggle",
+            "toggel alias" => "alias toggle",
+            "toggle wifi" => "wifi toggle",
+            "toggel wifi" => "wifi toggle",
+            "toggel" => "toggle",
+            _ => args,
+        };
     }
 
     private void DrawCommandHelpContent(string id, bool legacyStyle)
@@ -2578,10 +2934,15 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.Spacing();
         DrawSectionTitle("Chat Alias");
         DrawModuleToggle("Enable chat alias", configuration.ChatAliasEnabled, rollTrackerService.SetChatAliasEnabled);
+        DrawChatAliasWakeToggle();
 
         ImGui.Spacing();
         DrawSectionTitle("Wifi");
         DrawModuleToggle("Enable !wifi", configuration.WifiEnabled, rollTrackerService.SetWifiEnabled);
+
+        ImGui.Spacing();
+        DrawSectionTitle("Auto Off");
+        DrawAutoOffSettingsSummary();
         EndPanel();
 
         ImGui.SameLine();
@@ -2591,15 +2952,6 @@ internal sealed class MainWindow : Window, IDisposable
         DrawUiLayoutCombo();
         DrawUiThemeCombo();
         DrawOpenChangelogButton();
-        ImGui.Spacing();
-
-        var autoDisableWhenLeavingHousing = configuration.AutoDisableWhenLeavingHousing;
-        if (ImGui.Checkbox("Auto off outside house", ref autoDisableWhenLeavingHousing))
-        {
-            configuration.AutoDisableWhenLeavingHousing = autoDisableWhenLeavingHousing;
-            saveConfiguration();
-        }
-
         ImGui.Spacing();
         if (DrawSettingsButton("Open config folder"))
         {
@@ -3164,6 +3516,7 @@ internal sealed class MainWindow : Window, IDisposable
         CommandHelp,
         ChatAlias,
         Wifi,
+        AutoOff,
         Settings,
     }
 

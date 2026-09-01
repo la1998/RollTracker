@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Chat;
 using Dalamud.Game.Text;
 using Dalamud.Plugin.Services;
@@ -14,6 +15,7 @@ namespace RollTracker.Services;
 internal sealed partial class RollTrackerService : IDisposable
 {
     private const string DefaultResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})";
+    private const int ChatAliasFeedbackDelayMilliseconds = 1500;
     private const string LegacySecondPairMacroText = "/y ♦ Time for Truth or Dare 2 ♦  Highest asks lowest, second highest asks second lowest. Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
     private const string DefaultSecondPairMacroText = "/y ♦ Time for Truth or Dare 2 ♦  Highest asks lowest, second highest asks second lowest,  \"Truth or Dare?\" Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
     private const string LegacySecondPairResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll}) 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})";
@@ -23,6 +25,7 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly ICommandManager commandManager;
     private readonly IFramework framework;
     private readonly IClientState clientState;
+    private readonly ICondition condition;
     private readonly IPluginLog log;
     private readonly Configuration configuration;
     private readonly System.Action saveConfiguration;
@@ -32,6 +35,7 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly Queue<MacroStep> pendingWifiMacroSteps = [];
     private readonly Queue<DelayedCommand> pendingTodPromptCommands = [];
     private readonly HashSet<uint> housingInteriorTerritoryIds;
+    private readonly HashSet<uint> residentialTerritoryIds;
     private readonly List<string> worldNames;
 
     private DateTimeOffset? roundEndsAt;
@@ -40,12 +44,17 @@ internal sealed partial class RollTrackerService : IDisposable
     private RoundKind currentRoundKind = RoundKind.Normal;
     private int nextManualRollNumber = 1;
     private bool wasInHousingInterior;
+    private bool wasInResidentialArea;
+    private bool wasBetweenAreas;
+    private bool lastAutoOffTransitionWasHousingInteriorMove;
+    private uint lastTerritoryType;
 
     public RollTrackerService(
         IChatGui chatGui,
         ICommandManager commandManager,
         IFramework framework,
         IClientState clientState,
+        ICondition condition,
         IDataManager dataManager,
         IPluginLog log,
         Configuration configuration,
@@ -55,13 +64,18 @@ internal sealed partial class RollTrackerService : IDisposable
         this.commandManager = commandManager;
         this.framework = framework;
         this.clientState = clientState;
+        this.condition = condition;
         this.log = log;
         this.configuration = configuration;
         this.saveConfiguration = saveConfiguration;
         NormalizeLegacyDefaults();
         housingInteriorTerritoryIds = dataManager.GetExcelSheet<HousingIndoorTerritory>()?.Select(row => row.RowId).ToHashSet() ?? [];
+        residentialTerritoryIds = CreateDefaultResidentialTerritoryIds();
         worldNames = BuildWorldNames(dataManager);
+        lastTerritoryType = clientState.TerritoryType;
         wasInHousingInterior = IsHousingInterior(clientState.TerritoryType);
+        wasInResidentialArea = IsResidentialArea(clientState.TerritoryType);
+        wasBetweenAreas = IsBetweenAreas();
 
         this.chatGui.ChatMessage += OnHandleableChatMessage;
         this.chatGui.LogMessage += OnLogMessage;
@@ -885,6 +899,7 @@ internal sealed partial class RollTrackerService : IDisposable
     private void OnFrameworkUpdate(IFramework framework)
     {
         var now = DateTimeOffset.Now;
+        TrackAutoOffLocationState();
 
         if (roundEndsAt is not null && pendingMacroSteps.Count > 0 && now >= nextMacroStepAt)
         {
@@ -909,40 +924,184 @@ internal sealed partial class RollTrackerService : IDisposable
 
     private void OnTerritoryChanged(uint territoryType)
     {
-        var isInHousingInterior = IsHousingInterior(territoryType);
+        ProcessTerritoryChange(territoryType, forceZoneChange: false);
+    }
 
-        if (configuration.AutoDisableWhenLeavingHousing &&
-            (configuration.Enabled ||
-             configuration.TodSecondPairEnabled ||
-             configuration.TruthTriggerEnabled ||
-             configuration.DareTriggerEnabled ||
-             configuration.HelpTriggerEnabled ||
-             configuration.ChatAliasEnabled ||
-             configuration.WifiEnabled) &&
-            wasInHousingInterior &&
-            !isInHousingInterior)
+    private void TrackAutoOffLocationState()
+    {
+        var territoryType = clientState.TerritoryType;
+        var isBetweenAreas = IsBetweenAreas();
+
+        if (territoryType != 0 && territoryType != lastTerritoryType)
         {
-            configuration.Enabled = false;
-            configuration.TruthTriggerEnabled = false;
-            configuration.DareTriggerEnabled = false;
-            configuration.HelpTriggerEnabled = false;
-            configuration.ChatAliasEnabled = false;
-            configuration.TodSecondPairEnabled = false;
-            configuration.WifiEnabled = false;
-            roundEndsAt = null;
-            pendingMacroSteps.Clear();
-            pendingWifiMacroSteps.Clear();
-            pendingTodPromptCommands.Clear();
-            saveConfiguration();
-            chatGui.Print("RollTracker disabled because you left the house.", "RollTracker");
+            ProcessTerritoryChange(territoryType, forceZoneChange: false);
+        }
+        else if (territoryType != 0 && wasBetweenAreas && !isBetweenAreas)
+        {
+            ProcessTerritoryChange(territoryType, forceZoneChange: true);
         }
 
+        wasBetweenAreas = isBetweenAreas;
+    }
+
+    private void ProcessTerritoryChange(uint territoryType, bool forceZoneChange)
+    {
+        if (territoryType == 0)
+        {
+            return;
+        }
+
+        var isInHousingInterior = IsHousingInterior(territoryType);
+        var isInResidentialArea = IsResidentialArea(territoryType);
+        var territoryChanged = (lastTerritoryType != 0 && lastTerritoryType != territoryType) || forceZoneChange;
+        var leftHousingInterior = wasInHousingInterior && !isInHousingInterior;
+        var enteredHousingInterior = !wasInHousingInterior && isInHousingInterior;
+        var autoOffReason = GetAutoDisableReason(
+            territoryChanged,
+            forceZoneChange,
+            leftHousingInterior,
+            enteredHousingInterior,
+            isInResidentialArea);
+
+        if (autoOffReason is not null && HasEnabledModules())
+        {
+            DisableModulesForAutoOff(autoOffReason);
+        }
+
+        lastTerritoryType = territoryType;
+        lastAutoOffTransitionWasHousingInteriorMove = leftHousingInterior || enteredHousingInterior;
         wasInHousingInterior = isInHousingInterior;
+        wasInResidentialArea = isInResidentialArea;
+    }
+
+    private bool IsBetweenAreas()
+    {
+        return condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51];
     }
 
     private bool IsHousingInterior(uint territoryType)
     {
         return housingInteriorTerritoryIds.Contains(territoryType);
+    }
+
+    private bool IsResidentialArea(uint territoryType)
+    {
+        return IsHousingInterior(territoryType) || residentialTerritoryIds.Contains(territoryType);
+    }
+
+    private string? GetAutoDisableReason(
+        bool territoryChanged,
+        bool forceZoneChange,
+        bool leftHousingInterior,
+        bool enteredHousingInterior,
+        bool isInResidentialArea)
+    {
+        if (!configuration.AutoDisableWhenLeavingHousing)
+        {
+            return null;
+        }
+
+        if (configuration.AutoDisableOnLeavingHousingInterior && leftHousingInterior)
+        {
+            return "you left the house";
+        }
+
+        if (configuration.AutoDisableOnEnteringHousingInterior && enteredHousingInterior)
+        {
+            return "you entered the house";
+        }
+
+        if (configuration.AutoDisableOnLeavingResidentialArea && wasInResidentialArea && !isInResidentialArea)
+        {
+            return "you left the residential area";
+        }
+
+        if (configuration.AutoDisableOnTerritoryChange &&
+            territoryChanged &&
+            !leftHousingInterior &&
+            !enteredHousingInterior &&
+            !(forceZoneChange && lastAutoOffTransitionWasHousingInteriorMove))
+        {
+            return "you changed territory";
+        }
+
+        return null;
+    }
+
+    private bool HasEnabledModules()
+    {
+        return (configuration.AutoDisableAffectsTod && configuration.Enabled) ||
+            (configuration.AutoDisableAffectsTodSecondPair && configuration.TodSecondPairEnabled) ||
+            (configuration.AutoDisableAffectsTodSpecialRules && configuration.TodSpecialRulesEnabled) ||
+            (configuration.AutoDisableAffectsTruth && configuration.TruthTriggerEnabled) ||
+            (configuration.AutoDisableAffectsDare && configuration.DareTriggerEnabled) ||
+            (configuration.AutoDisableAffectsHelp && configuration.HelpTriggerEnabled) ||
+            (configuration.AutoDisableAffectsChatAlias && configuration.ChatAliasEnabled) ||
+            (configuration.AutoDisableAffectsWifi && configuration.WifiEnabled);
+    }
+
+    private void DisableModulesForAutoOff(string reason)
+    {
+        if (configuration.AutoDisableAffectsTod)
+        {
+            configuration.Enabled = false;
+            roundEndsAt = null;
+            pendingMacroSteps.Clear();
+        }
+
+        if (configuration.AutoDisableAffectsTodSecondPair)
+        {
+            configuration.TodSecondPairEnabled = false;
+        }
+
+        if (configuration.AutoDisableAffectsTodSpecialRules)
+        {
+            configuration.TodSpecialRulesEnabled = false;
+        }
+
+        if (configuration.AutoDisableAffectsTruth)
+        {
+            configuration.TruthTriggerEnabled = false;
+            ClearDelayedTodPrompts("Truth");
+        }
+
+        if (configuration.AutoDisableAffectsDare)
+        {
+            configuration.DareTriggerEnabled = false;
+            ClearDelayedTodPrompts("Dare");
+        }
+
+        if (configuration.AutoDisableAffectsHelp)
+        {
+            configuration.HelpTriggerEnabled = false;
+            ClearDelayedTodPrompts("Help");
+        }
+
+        if (configuration.AutoDisableAffectsChatAlias)
+        {
+            configuration.ChatAliasEnabled = false;
+        }
+
+        if (configuration.AutoDisableAffectsWifi)
+        {
+            configuration.WifiEnabled = false;
+            pendingWifiMacroSteps.Clear();
+        }
+
+        saveConfiguration();
+        chatGui.Print($"RollTracker disabled because {reason}.", "RollTracker");
+    }
+
+    private static HashSet<uint> CreateDefaultResidentialTerritoryIds()
+    {
+        return
+        [
+            339,
+            340,
+            341,
+            641,
+            979,
+        ];
     }
 
     private bool IsSecondPairRoundRunning => roundEndsAt is not null && currentRoundKind == RoundKind.SecondPair;
@@ -1141,8 +1300,7 @@ internal sealed partial class RollTrackerService : IDisposable
 
     private bool TryHandleChatAlias(string sender, string message)
     {
-        if (!configuration.ChatAliasEnabled ||
-            string.IsNullOrWhiteSpace(configuration.ChatAliasWord) ||
+        if (string.IsNullOrWhiteSpace(configuration.ChatAliasWord) ||
             configuration.ChatAliasCommands.Count == 0)
         {
             return false;
@@ -1156,29 +1314,77 @@ internal sealed partial class RollTrackerService : IDisposable
             return false;
         }
 
-        var requestedAlias = message[aliasWord.Length..].Trim();
+        var requestedAlias = NormalizeChatAliasTrigger(message[aliasWord.Length..]);
         var aliasCommand = configuration.ChatAliasCommands.FirstOrDefault(command =>
             command.Enabled &&
-            command.TriggerText.Equals(requestedAlias, StringComparison.OrdinalIgnoreCase));
+            NormalizeChatAliasTrigger(command.TriggerText).Equals(requestedAlias, StringComparison.OrdinalIgnoreCase));
         if (aliasCommand is null)
         {
             return false;
         }
 
-        ExecuteChatAliasCommand(aliasCommand.RtCommandArgs, string.IsNullOrWhiteSpace(sender) ? "Unknown" : sender);
+        if (!configuration.ChatAliasEnabled &&
+            (!configuration.ChatAliasAllowEnableWhenDisabled || !IsChatAliasEnableCommand(aliasCommand.RtCommandArgs)))
+        {
+            return false;
+        }
+
+        if (ExecuteChatAliasCommand(aliasCommand.RtCommandArgs, string.IsNullOrWhiteSpace(sender) ? "Unknown" : sender) &&
+            aliasCommand.FeedbackEnabled &&
+            TryBuildChatAliasFeedbackMessage(aliasCommand.RtCommandArgs, out var feedbackMessage))
+        {
+            var feedbackCommand = $"{GetChatCommand(configuration.ChatAliasFeedbackChatChannel)} {feedbackMessage}";
+            pendingTodPromptCommands.Enqueue(new DelayedCommand(
+                feedbackCommand,
+                "Chat alias feedback",
+                DateTimeOffset.Now.AddMilliseconds(ChatAliasFeedbackDelayMilliseconds)));
+        }
+
         return true;
     }
 
-    private void ExecuteChatAliasCommand(string args, string sender)
+    private static string NormalizeChatAliasTrigger(string trigger)
+    {
+        trigger = trigger.Trim();
+        if (trigger.StartsWith("/", StringComparison.Ordinal))
+        {
+            trigger = trigger[1..].TrimStart();
+        }
+
+        return Regex.Replace(trigger, @"\s+", " ");
+    }
+
+    private static bool IsChatAliasEnableCommand(string args)
+    {
+        args = args.Trim();
+        return args.Equals("on", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("on all", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("all on", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("on alias", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("alias on", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("toggle", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("toggle all", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("all toggle", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("toggel", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("toggel all", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("all toggel", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("toggle alias", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("alias toggle", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("toggel alias", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("alias toggel", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool ExecuteChatAliasCommand(string args, string sender)
     {
         var normalizedArgs = args.Trim();
         chatGui.Print($"Chat alias from {sender}: /rt {normalizedArgs}", "RollTracker");
 
         if (TryExecuteModuleToggle(normalizedArgs, true) ||
             TryExecuteModuleToggle(normalizedArgs, false) ||
+            TryExecuteModuleToggleSwitch(normalizedArgs) ||
             TryExecuteReversedModuleToggle(normalizedArgs))
         {
-            return;
+            return true;
         }
 
         if (normalizedArgs.Equals("reset", StringComparison.OrdinalIgnoreCase) ||
@@ -1186,19 +1392,118 @@ internal sealed partial class RollTrackerService : IDisposable
         {
             Reset();
             chatGui.Print("Roll list reset.", "RollTracker");
-            return;
+            return true;
         }
 
         if (normalizedArgs.Equals("end", StringComparison.OrdinalIgnoreCase))
         {
             FinishRoundAndReset();
-            return;
+            return true;
         }
 
         if (normalizedArgs.Equals("test", StringComparison.OrdinalIgnoreCase))
         {
             AddTestRolls();
+            return true;
         }
+
+        return false;
+    }
+
+    private bool TryBuildChatAliasFeedbackMessage(string args, out string message)
+    {
+        var target = GetModuleTargetFromToggleCommand(args.Trim());
+        if (target.Length == 0 || target.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            message = HasAnyModuleEnabled()
+                ? "RollTracker modules have been enabled."
+                : "RollTracker modules have been disabled.";
+            return true;
+        }
+
+        var moduleName = GetModuleFeedbackName(target);
+        if (moduleName.Length == 0)
+        {
+            message = string.Empty;
+            return false;
+        }
+
+        message = $"{moduleName} has been {(IsModuleTargetEnabled(target) ? "enabled" : "disabled")}.";
+        return true;
+    }
+
+    private static string GetModuleTargetFromToggleCommand(string args)
+    {
+        if (args.Equals("on", StringComparison.OrdinalIgnoreCase) ||
+            args.Equals("off", StringComparison.OrdinalIgnoreCase) ||
+            IsToggleWord(args))
+        {
+            return string.Empty;
+        }
+
+        if (args.StartsWith("on ", StringComparison.OrdinalIgnoreCase))
+        {
+            return args["on ".Length..].Trim();
+        }
+
+        if (args.StartsWith("off ", StringComparison.OrdinalIgnoreCase))
+        {
+            return args["off ".Length..].Trim();
+        }
+
+        if (args.StartsWith("toggle ", StringComparison.OrdinalIgnoreCase))
+        {
+            return args["toggle ".Length..].Trim();
+        }
+
+        if (args.StartsWith("toggel ", StringComparison.OrdinalIgnoreCase))
+        {
+            return args["toggel ".Length..].Trim();
+        }
+
+        var parts = args.Split(' ', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 2 &&
+            (parts[1].Equals("on", StringComparison.OrdinalIgnoreCase) ||
+             parts[1].Equals("off", StringComparison.OrdinalIgnoreCase) ||
+             IsToggleWord(parts[1])))
+        {
+            return parts[0];
+        }
+
+        return string.Empty;
+    }
+
+    private static string GetModuleFeedbackName(string target)
+    {
+        return target.Trim().ToLowerInvariant() switch
+        {
+            "all" => string.Empty,
+            "tod" => "Truth or Dare module",
+            "todrules" or "tod rules" or "special" => "Truth or Dare special rules",
+            "todsecond" or "tod second" or "second" => "Truth or Dare doubles module",
+            "truth" or "!truth" => "Truth prompt module",
+            "dare" or "!dare" => "Dare prompt module",
+            "help" or "!help" => "Command help module",
+            "alias" or "chat alias" => "Chat alias module",
+            "wifi" => "Wifi module",
+            _ => string.Empty,
+        };
+    }
+
+    private bool IsModuleTargetEnabled(string target)
+    {
+        return target.Trim().ToLowerInvariant() switch
+        {
+            "tod" => configuration.Enabled,
+            "todrules" or "tod rules" or "special" => configuration.TodSpecialRulesEnabled,
+            "todsecond" or "tod second" or "second" => configuration.TodSecondPairEnabled,
+            "truth" or "!truth" => configuration.TruthTriggerEnabled,
+            "dare" or "!dare" => configuration.DareTriggerEnabled,
+            "help" or "!help" => configuration.HelpTriggerEnabled,
+            "alias" or "chat alias" => configuration.ChatAliasEnabled,
+            "wifi" => configuration.WifiEnabled,
+            _ => false,
+        };
     }
 
     private bool TryExecuteModuleToggle(string args, bool enabled)
@@ -1276,6 +1581,124 @@ internal sealed partial class RollTrackerService : IDisposable
         return false;
     }
 
+    private bool TryExecuteModuleToggleSwitch(string args)
+    {
+        if (IsToggleWord(args))
+        {
+            SetAllModulesEnabled(!HasAnyModuleEnabled());
+            return true;
+        }
+
+        var target = string.Empty;
+        if (args.StartsWith("toggle ", StringComparison.OrdinalIgnoreCase))
+        {
+            target = args["toggle ".Length..].Trim();
+        }
+        else if (args.StartsWith("toggel ", StringComparison.OrdinalIgnoreCase))
+        {
+            target = args["toggel ".Length..].Trim();
+        }
+        else
+        {
+            var parts = args.Split(' ', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2 || !IsToggleWord(parts[1]))
+            {
+                return false;
+            }
+
+            target = parts[0];
+        }
+
+        return ToggleModuleTarget(target);
+    }
+
+    private bool ToggleModuleTarget(string target)
+    {
+        if (target.Length == 0 || target.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            SetAllModulesEnabled(!HasAnyModuleEnabled());
+            return true;
+        }
+
+        if (target.Equals("tod", StringComparison.OrdinalIgnoreCase))
+        {
+            SetEnabled(!configuration.Enabled);
+            return true;
+        }
+
+        if (target.Equals("todrules", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("tod rules", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("special", StringComparison.OrdinalIgnoreCase))
+        {
+            configuration.TodSpecialRulesEnabled = !configuration.TodSpecialRulesEnabled;
+            saveConfiguration();
+            chatGui.Print($"RollTracker ToD special rules {(configuration.TodSpecialRulesEnabled ? "enabled" : "disabled")}.", "RollTracker");
+            return true;
+        }
+
+        if (target.Equals("todsecond", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("tod second", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("second", StringComparison.OrdinalIgnoreCase))
+        {
+            SetSecondPairEnabled(!configuration.TodSecondPairEnabled);
+            return true;
+        }
+
+        if (target.Equals("truth", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!truth", StringComparison.OrdinalIgnoreCase))
+        {
+            SetTruthTriggerEnabled(!configuration.TruthTriggerEnabled);
+            return true;
+        }
+
+        if (target.Equals("dare", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!dare", StringComparison.OrdinalIgnoreCase))
+        {
+            SetDareTriggerEnabled(!configuration.DareTriggerEnabled);
+            return true;
+        }
+
+        if (target.Equals("help", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!help", StringComparison.OrdinalIgnoreCase))
+        {
+            SetHelpTriggerEnabled(!configuration.HelpTriggerEnabled);
+            return true;
+        }
+
+        if (target.Equals("alias", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("chat alias", StringComparison.OrdinalIgnoreCase))
+        {
+            SetChatAliasEnabled(!configuration.ChatAliasEnabled);
+            return true;
+        }
+
+        if (target.Equals("wifi", StringComparison.OrdinalIgnoreCase))
+        {
+            SetWifiEnabled(!configuration.WifiEnabled);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool HasAnyModuleEnabled()
+    {
+        return configuration.Enabled ||
+            configuration.TodSecondPairEnabled ||
+            configuration.TodSpecialRulesEnabled ||
+            configuration.TruthTriggerEnabled ||
+            configuration.DareTriggerEnabled ||
+            configuration.HelpTriggerEnabled ||
+            configuration.ChatAliasEnabled ||
+            configuration.WifiEnabled;
+    }
+
+    private static bool IsToggleWord(string text)
+    {
+        return text.Equals("toggle", StringComparison.OrdinalIgnoreCase) ||
+            text.Equals("toggel", StringComparison.OrdinalIgnoreCase);
+    }
+
     private bool TryExecuteReversedModuleToggle(string args)
     {
         var parts = args.Split(' ', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -1292,6 +1715,11 @@ internal sealed partial class RollTrackerService : IDisposable
         if (parts[1].Equals("off", StringComparison.OrdinalIgnoreCase))
         {
             return TryExecuteModuleToggle($"off {parts[0]}", false);
+        }
+
+        if (IsToggleWord(parts[1]))
+        {
+            return TryExecuteModuleToggleSwitch(args);
         }
 
         return false;

@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Dalamud.Game.Command;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -30,22 +31,31 @@ public sealed class Plugin : IDalamudPlugin
         "/rt help - show this command list locally.",
         "/rt on - enable all modules.",
         "/rt off - disable all modules.",
-        "/rt on tod - enable Truth or Dare.",
-        "/rt off tod - disable Truth or Dare.",
-        "/rt on todrules - enable Truth or Dare special rules.",
-        "/rt off todrules - disable Truth or Dare special rules.",
-        "/rt on todsecond - enable !tod2 second pair rounds.",
-        "/rt off todsecond - disable !tod2 second pair rounds.",
-        "/rt on truth - enable !truth.",
-        "/rt off truth - disable !truth.",
-        "/rt on dare - enable !dare.",
-        "/rt off dare - disable !dare.",
-        "/rt on help - enable !help.",
-        "/rt off help - disable !help.",
-        "/rt on alias - enable chat alias.",
-        "/rt off alias - disable chat alias.",
-        "/rt on wifi - enable !wifi.",
-        "/rt off wifi - disable !wifi.",
+        "/rt toggle - toggle all modules.",
+        "/rt tod on - enable Truth or Dare.",
+        "/rt tod off - disable Truth or Dare.",
+        "/rt tod toggle - toggle Truth or Dare.",
+        "/rt todrules on - enable Truth or Dare special rules.",
+        "/rt todrules off - disable Truth or Dare special rules.",
+        "/rt todrules toggle - toggle Truth or Dare special rules.",
+        "/rt todsecond on - enable !tod2 second pair rounds.",
+        "/rt todsecond off - disable !tod2 second pair rounds.",
+        "/rt todsecond toggle - toggle !tod2 second pair rounds.",
+        "/rt truth on - enable !truth.",
+        "/rt truth off - disable !truth.",
+        "/rt truth toggle - toggle !truth.",
+        "/rt dare on - enable !dare.",
+        "/rt dare off - disable !dare.",
+        "/rt dare toggle - toggle !dare.",
+        "/rt help on - enable !help.",
+        "/rt help off - disable !help.",
+        "/rt help toggle - toggle !help.",
+        "/rt alias on - enable chat alias.",
+        "/rt alias off - disable chat alias.",
+        "/rt alias toggle - toggle chat alias.",
+        "/rt wifi on - enable !wifi.",
+        "/rt wifi off - disable !wifi.",
+        "/rt wifi toggle - toggle !wifi.",
         "/rt status - show module states.",
         "/rt reset - clear the current roll list.",
         "/rt end - send the current result, then clear the list.",
@@ -68,6 +78,9 @@ public sealed class Plugin : IDalamudPlugin
 
     [PluginService]
     internal static IClientState ClientState { get; private set; } = null!;
+
+    [PluginService]
+    internal static ICondition Condition { get; private set; } = null!;
 
     [PluginService]
     internal static IDataManager DataManager { get; private set; } = null!;
@@ -98,6 +111,7 @@ public sealed class Plugin : IDalamudPlugin
             CommandManager,
             Framework,
             ClientState,
+            Condition,
             DataManager,
             Log,
             Configuration,
@@ -171,6 +185,11 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         if (TryHandleModuleToggle(trimmedArgs, false))
+        {
+            return;
+        }
+
+        if (TryHandleModuleToggleSwitch(trimmedArgs))
         {
             return;
         }
@@ -293,6 +312,124 @@ public sealed class Plugin : IDalamudPlugin
         return false;
     }
 
+    private bool TryHandleModuleToggleSwitch(string args)
+    {
+        if (IsToggleWord(args))
+        {
+            RollTrackerService.SetAllModulesEnabled(!HasAnyModuleEnabled());
+            return true;
+        }
+
+        var target = string.Empty;
+        if (args.StartsWith("toggle ", StringComparison.OrdinalIgnoreCase))
+        {
+            target = args["toggle ".Length..].Trim();
+        }
+        else if (args.StartsWith("toggel ", StringComparison.OrdinalIgnoreCase))
+        {
+            target = args["toggel ".Length..].Trim();
+        }
+        else
+        {
+            var parts = args.Split(' ', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2 || !IsToggleWord(parts[1]))
+            {
+                return false;
+            }
+
+            target = parts[0];
+        }
+
+        return ToggleModuleTarget(target);
+    }
+
+    private bool ToggleModuleTarget(string target)
+    {
+        if (target.Length == 0 || target.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetAllModulesEnabled(!HasAnyModuleEnabled());
+            return true;
+        }
+
+        if (target.Equals("tod", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetEnabled(!Configuration.Enabled);
+            return true;
+        }
+
+        if (target.Equals("todrules", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("tod rules", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("special", StringComparison.OrdinalIgnoreCase))
+        {
+            Configuration.TodSpecialRulesEnabled = !Configuration.TodSpecialRulesEnabled;
+            SaveConfiguration();
+            ChatGui.Print($"RollTracker ToD special rules {(Configuration.TodSpecialRulesEnabled ? "enabled" : "disabled")}.", "RollTracker");
+            return true;
+        }
+
+        if (target.Equals("todsecond", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("tod second", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("second", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetSecondPairEnabled(!Configuration.TodSecondPairEnabled);
+            return true;
+        }
+
+        if (target.Equals("truth", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!truth", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetTruthTriggerEnabled(!Configuration.TruthTriggerEnabled);
+            return true;
+        }
+
+        if (target.Equals("dare", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!dare", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetDareTriggerEnabled(!Configuration.DareTriggerEnabled);
+            return true;
+        }
+
+        if (target.Equals("help", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("!help", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetHelpTriggerEnabled(!Configuration.HelpTriggerEnabled);
+            return true;
+        }
+
+        if (target.Equals("alias", StringComparison.OrdinalIgnoreCase) ||
+            target.Equals("chat alias", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetChatAliasEnabled(!Configuration.ChatAliasEnabled);
+            return true;
+        }
+
+        if (target.Equals("wifi", StringComparison.OrdinalIgnoreCase))
+        {
+            RollTrackerService.SetWifiEnabled(!Configuration.WifiEnabled);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool HasAnyModuleEnabled()
+    {
+        return Configuration.Enabled ||
+            Configuration.TodSecondPairEnabled ||
+            Configuration.TodSpecialRulesEnabled ||
+            Configuration.TruthTriggerEnabled ||
+            Configuration.DareTriggerEnabled ||
+            Configuration.HelpTriggerEnabled ||
+            Configuration.ChatAliasEnabled ||
+            Configuration.WifiEnabled;
+    }
+
+    private static bool IsToggleWord(string text)
+    {
+        return text.Equals("toggle", StringComparison.OrdinalIgnoreCase) ||
+            text.Equals("toggel", StringComparison.OrdinalIgnoreCase);
+    }
+
     private bool TryHandleReversedModuleToggle(string args)
     {
         var parts = args.Split(' ', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -309,6 +446,11 @@ public sealed class Plugin : IDalamudPlugin
         if (parts[1].Equals("off", StringComparison.OrdinalIgnoreCase))
         {
             return TryHandleModuleToggle($"off {parts[0]}", false);
+        }
+
+        if (IsToggleWord(parts[1]))
+        {
+            return TryHandleModuleToggleSwitch(args);
         }
 
         return false;

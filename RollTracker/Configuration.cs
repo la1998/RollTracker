@@ -21,9 +21,35 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool ChatAliasEnabled { get; set; }
 
+    public bool ChatAliasAllowEnableWhenDisabled { get; set; }
+
     public bool WifiEnabled { get; set; } = true;
 
     public bool AutoDisableWhenLeavingHousing { get; set; } = true;
+
+    public bool AutoDisableOnLeavingHousingInterior { get; set; } = true;
+
+    public bool AutoDisableOnEnteringHousingInterior { get; set; }
+
+    public bool AutoDisableOnLeavingResidentialArea { get; set; }
+
+    public bool AutoDisableOnTerritoryChange { get; set; }
+
+    public bool AutoDisableAffectsTod { get; set; } = true;
+
+    public bool AutoDisableAffectsTodSecondPair { get; set; } = true;
+
+    public bool AutoDisableAffectsTodSpecialRules { get; set; } = true;
+
+    public bool AutoDisableAffectsTruth { get; set; } = true;
+
+    public bool AutoDisableAffectsDare { get; set; } = true;
+
+    public bool AutoDisableAffectsHelp { get; set; } = true;
+
+    public bool AutoDisableAffectsChatAlias { get; set; } = true;
+
+    public bool AutoDisableAffectsWifi { get; set; } = true;
 
     public bool AdvancedMode { get; set; }
 
@@ -66,6 +92,8 @@ public sealed class Configuration : IPluginConfiguration
     public string HelpChatChannel { get; set; } = "Yell";
 
     public string ChatAliasWord { get; set; } = "alias";
+
+    public string ChatAliasFeedbackChatChannel { get; set; } = "Say";
 
     public List<ChatAliasCommand> ChatAliasCommands { get; set; } = [];
 
@@ -219,6 +247,8 @@ public sealed class TodSpecialRule
 public sealed class ChatAliasCommand
 {
     public bool Enabled { get; set; } = true;
+
+    public bool FeedbackEnabled { get; set; }
 
     public string TriggerText { get; set; } = string.Empty;
 
