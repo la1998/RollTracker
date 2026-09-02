@@ -80,6 +80,9 @@ public sealed class Plugin : IDalamudPlugin
     internal static IClientState ClientState { get; private set; } = null!;
 
     [PluginService]
+    internal static IPlayerState PlayerState { get; private set; } = null!;
+
+    [PluginService]
     internal static ICondition Condition { get; private set; } = null!;
 
     [PluginService]
@@ -100,6 +103,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private ChangelogWindow ChangelogWindow { get; }
 
+    private HousingDebugWindow HousingDebugWindow { get; }
+
     public Plugin()
     {
         var currentVersion = GetPluginVersion();
@@ -111,6 +116,7 @@ public sealed class Plugin : IDalamudPlugin
             CommandManager,
             Framework,
             ClientState,
+            PlayerState,
             Condition,
             DataManager,
             Log,
@@ -118,6 +124,7 @@ public sealed class Plugin : IDalamudPlugin
             SaveConfiguration);
         RollHistoryWindow = new RollHistoryWindow(RollTrackerService);
         ChangelogWindow = new ChangelogWindow(Configuration, SaveConfiguration, currentVersion);
+        HousingDebugWindow = new HousingDebugWindow(RollTrackerService);
         MainWindow = new MainWindow(
             RollTrackerService,
             Configuration,
@@ -125,11 +132,13 @@ public sealed class Plugin : IDalamudPlugin
             ChatGui,
             SaveConfiguration,
             () => RollHistoryWindow.IsOpen = true,
-            ChangelogWindow.OpenHistory);
+            ChangelogWindow.OpenHistory,
+            () => HousingDebugWindow.IsOpen = true);
 
         WindowSystem.AddWindow(MainWindow);
         WindowSystem.AddWindow(RollHistoryWindow);
         WindowSystem.AddWindow(ChangelogWindow);
+        WindowSystem.AddWindow(HousingDebugWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -158,6 +167,7 @@ public sealed class Plugin : IDalamudPlugin
         MainWindow.Dispose();
         RollHistoryWindow.Dispose();
         ChangelogWindow.Dispose();
+        HousingDebugWindow.Dispose();
         RollTrackerService.Dispose();
     }
 

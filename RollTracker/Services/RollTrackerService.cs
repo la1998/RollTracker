@@ -8,6 +8,7 @@ using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Chat;
 using Dalamud.Game.Text;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using Lumina.Excel.Sheets;
 
 namespace RollTracker.Services;
@@ -25,6 +26,7 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly ICommandManager commandManager;
     private readonly IFramework framework;
     private readonly IClientState clientState;
+    private readonly IPlayerState playerState;
     private readonly ICondition condition;
     private readonly IPluginLog log;
     private readonly Configuration configuration;
@@ -37,6 +39,8 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly HashSet<uint> housingInteriorTerritoryIds;
     private readonly HashSet<uint> residentialTerritoryIds;
     private readonly List<string> worldNames;
+    private readonly Dictionary<ushort, WorldDebugInfo> worldInfos;
+    private readonly Dictionary<uint, string> territoryNames;
 
     private DateTimeOffset? roundEndsAt;
     private DateTimeOffset nextMacroStepAt;
@@ -47,6 +51,8 @@ internal sealed partial class RollTrackerService : IDisposable
     private bool wasInResidentialArea;
     private bool wasBetweenAreas;
     private bool lastAutoOffTransitionWasHousingInteriorMove;
+    private DateTimeOffset? pendingAutoOnCheckUntil;
+    private bool pendingAutoOnEnteringAutoOff;
     private uint lastTerritoryType;
 
     public RollTrackerService(
@@ -54,6 +60,7 @@ internal sealed partial class RollTrackerService : IDisposable
         ICommandManager commandManager,
         IFramework framework,
         IClientState clientState,
+        IPlayerState playerState,
         ICondition condition,
         IDataManager dataManager,
         IPluginLog log,
@@ -64,6 +71,7 @@ internal sealed partial class RollTrackerService : IDisposable
         this.commandManager = commandManager;
         this.framework = framework;
         this.clientState = clientState;
+        this.playerState = playerState;
         this.condition = condition;
         this.log = log;
         this.configuration = configuration;
@@ -72,6 +80,8 @@ internal sealed partial class RollTrackerService : IDisposable
         housingInteriorTerritoryIds = dataManager.GetExcelSheet<HousingIndoorTerritory>()?.Select(row => row.RowId).ToHashSet() ?? [];
         residentialTerritoryIds = CreateDefaultResidentialTerritoryIds();
         worldNames = BuildWorldNames(dataManager);
+        worldInfos = BuildWorldInfos(dataManager);
+        territoryNames = BuildTerritoryNames(dataManager);
         lastTerritoryType = clientState.TerritoryType;
         wasInHousingInterior = IsHousingInterior(clientState.TerritoryType);
         wasInResidentialArea = IsResidentialArea(clientState.TerritoryType);
@@ -96,6 +106,203 @@ internal sealed partial class RollTrackerService : IDisposable
     public TimeSpan RemainingRoundTime => roundEndsAt is null
         ? TimeSpan.Zero
         : roundEndsAt.Value - DateTimeOffset.Now;
+
+    public unsafe HousingDebugInfo GetCurrentHousingDebugInfo()
+    {
+        var territoryType = clientState.TerritoryType;
+        var isHousingInterior = IsHousingInterior(territoryType);
+        var currentWorldInfo = GetCurrentWorldDebugInfo();
+        var currentTerritoryName = GetTerritoryName(territoryType);
+        var manager = HousingManager.Instance();
+        if (manager is null)
+        {
+            return new HousingDebugInfo(
+                territoryType,
+                isHousingInterior,
+                IsResidentialArea(territoryType),
+                IsBetweenAreas(),
+                false,
+                string.Empty,
+                sbyte.MinValue,
+                sbyte.MinValue,
+                byte.MinValue,
+                short.MinValue,
+                string.Empty,
+                string.Empty,
+                0,
+                false,
+                currentWorldInfo.WorldId,
+                currentWorldInfo.WorldName,
+                currentWorldInfo.DataCenterName,
+                currentTerritoryName,
+                BuildCurrentLocationPreview(currentWorldInfo, currentTerritoryName),
+                "-",
+                false);
+        }
+
+        var currentHouseId = manager->GetCurrentHouseId();
+        var currentIndoorHouseId = manager->GetCurrentIndoorHouseId();
+        var addressHouseId = currentIndoorHouseId.Id != 0 ? currentIndoorHouseId : currentHouseId;
+        var originalHouseTerritoryTypeId = HousingManager.GetOriginalHouseTerritoryTypeId();
+        var worldInfo = isHousingInterior && addressHouseId.WorldId != 0 && addressHouseId.WorldId != ushort.MaxValue
+            ? GetWorldDebugInfo(addressHouseId.WorldId)
+            : currentWorldInfo;
+        var districtName = GetTerritoryName(originalHouseTerritoryTypeId, addressHouseId.TerritoryTypeId, territoryType);
+        var addressPreview = isHousingInterior
+            ? BuildHousingAddressPreview(worldInfo, districtName, addressHouseId)
+            : "-";
+
+        return new HousingDebugInfo(
+            territoryType,
+            isHousingInterior,
+            IsResidentialArea(territoryType),
+            IsBetweenAreas(),
+            true,
+            manager->GetCurrentHousingTerritoryType().ToString(),
+            manager->GetCurrentWard(),
+            manager->GetCurrentPlot(),
+            manager->GetCurrentDivision(),
+            manager->GetCurrentRoom(),
+            FormatHouseId(currentHouseId),
+            FormatHouseId(currentIndoorHouseId),
+            originalHouseTerritoryTypeId,
+            manager->HasHousePermissions(),
+            addressHouseId.WorldId,
+            worldInfo.WorldName,
+            worldInfo.DataCenterName,
+            districtName,
+            BuildCurrentLocationPreview(currentWorldInfo, currentTerritoryName),
+            addressPreview,
+            isHousingInterior);
+    }
+
+    private static string FormatHouseId(HouseId houseId)
+    {
+        return $"Id={houseId.Id}, WardIndex={houseId.WardIndex}, PlotIndex={houseId.PlotIndex}, Room={houseId.RoomNumber}, Apartment={houseId.IsApartment}, ApartmentDivision={houseId.ApartmentDivision}, Territory={houseId.TerritoryTypeId}, World={houseId.WorldId}";
+    }
+
+    private WorldDebugInfo GetWorldDebugInfo(ushort worldId)
+    {
+        return worldInfos.TryGetValue(worldId, out var worldInfo)
+            ? worldInfo
+            : new WorldDebugInfo(worldId, worldId == 0 ? "-" : $"World {worldId}", "-");
+    }
+
+    private WorldDebugInfo GetCurrentWorldDebugInfo()
+    {
+        var currentWorld = playerState.CurrentWorld;
+        if (currentWorld.IsValid && currentWorld.ValueNullable is { } world)
+        {
+            var worldName = world.Name.ToString().Trim();
+            var dataCenterName = world.DataCenter.ValueNullable?.Name.ToString().Trim() ?? string.Empty;
+            var worldId = (ushort)(world.RowId != 0 ? world.RowId : currentWorld.RowId);
+            return new WorldDebugInfo(worldId, string.IsNullOrWhiteSpace(worldName) ? $"World {worldId}" : worldName, string.IsNullOrWhiteSpace(dataCenterName) ? "-" : dataCenterName);
+        }
+
+        return new WorldDebugInfo(0, "-", "-");
+    }
+
+    private string GetTerritoryName(params uint[] territoryIds)
+    {
+        foreach (var territoryId in territoryIds)
+        {
+            if (territoryId != 0 &&
+                territoryNames.TryGetValue(territoryId, out var territoryName) &&
+                !string.IsNullOrWhiteSpace(territoryName))
+            {
+                return territoryName;
+            }
+        }
+
+        return "-";
+    }
+
+    private static string BuildHousingAddressPreview(WorldDebugInfo worldInfo, string districtName, HouseId houseId)
+    {
+        var locationPrefix = $"{worldInfo.DataCenterName} / {worldInfo.WorldName} / {districtName}";
+        var ward = houseId.WardIndex + 1;
+        var plot = houseId.PlotIndex + 1;
+
+        if (houseId.IsApartment)
+        {
+            return $"{locationPrefix} / Ward {ward} / Apartment Room {houseId.RoomNumber}";
+        }
+
+        if (houseId.RoomNumber > 0)
+        {
+            return $"{locationPrefix} / Ward {ward} / Plot {plot} / Room {houseId.RoomNumber}";
+        }
+
+        return $"{locationPrefix} / Ward {ward} / Plot {plot}";
+    }
+
+    private static string BuildCurrentLocationPreview(WorldDebugInfo worldInfo, string territoryName)
+    {
+        return $"{worldInfo.DataCenterName} / {worldInfo.WorldName} / {territoryName}";
+    }
+
+    public unsafe bool TryCreateCurrentHousingAddressEntry(string name, out HousingAddressEntry entry, out string message)
+    {
+        entry = new HousingAddressEntry();
+        var territoryType = clientState.TerritoryType;
+        if (!IsHousingInterior(territoryType))
+        {
+            message = "Enter a housing interior before saving an address.";
+            return false;
+        }
+
+        var manager = HousingManager.Instance();
+        if (manager is null)
+        {
+            message = "Housing manager is not available yet.";
+            return false;
+        }
+
+        var currentHouseId = manager->GetCurrentHouseId();
+        var currentIndoorHouseId = manager->GetCurrentIndoorHouseId();
+        var houseId = currentIndoorHouseId.Id != 0 ? currentIndoorHouseId : currentHouseId;
+        if (houseId.Id == 0 || houseId.WorldId == 0 || houseId.WorldId == ushort.MaxValue)
+        {
+            message = "The current interior address is not reliable yet.";
+            return false;
+        }
+
+        var originalHouseTerritoryTypeId = HousingManager.GetOriginalHouseTerritoryTypeId();
+        var worldInfo = GetWorldDebugInfo(houseId.WorldId);
+        var districtName = GetTerritoryName(originalHouseTerritoryTypeId, houseId.TerritoryTypeId, territoryType);
+        var address = BuildHousingAddressPreview(worldInfo, districtName, houseId);
+
+        entry = new HousingAddressEntry
+        {
+            Enabled = true,
+            Name = string.IsNullOrWhiteSpace(name) ? address : name.Trim(),
+            Address = address,
+            DataCenterName = worldInfo.DataCenterName,
+            WorldName = worldInfo.WorldName,
+            WorldId = houseId.WorldId,
+            DistrictName = districtName,
+            TerritoryTypeId = houseId.TerritoryTypeId,
+            OriginalHouseTerritoryTypeId = originalHouseTerritoryTypeId,
+            WardIndex = (sbyte)houseId.WardIndex,
+            PlotIndex = (sbyte)houseId.PlotIndex,
+            Division = houseId.IsApartment ? houseId.ApartmentDivision : manager->GetCurrentDivision(),
+            RoomNumber = houseId.RoomNumber,
+            IsApartment = houseId.IsApartment,
+            HouseId = houseId.Id,
+        };
+        message = $"Saved address: {address}";
+        return true;
+    }
+
+    public static bool IsSameHousingAddress(HousingAddressEntry left, HousingAddressEntry right)
+    {
+        return left.WorldId == right.WorldId &&
+            left.OriginalHouseTerritoryTypeId == right.OriginalHouseTerritoryTypeId &&
+            left.WardIndex == right.WardIndex &&
+            left.PlotIndex == right.PlotIndex &&
+            left.RoomNumber == right.RoomNumber &&
+            left.IsApartment == right.IsApartment;
+    }
 
     private void NormalizeLegacyDefaults()
     {
@@ -900,6 +1107,7 @@ internal sealed partial class RollTrackerService : IDisposable
     {
         var now = DateTimeOffset.Now;
         TrackAutoOffLocationState();
+        ProcessPendingAutoOn(now);
 
         if (roundEndsAt is not null && pendingMacroSteps.Count > 0 && now >= nextMacroStepAt)
         {
@@ -956,11 +1164,27 @@ internal sealed partial class RollTrackerService : IDisposable
         var territoryChanged = (lastTerritoryType != 0 && lastTerritoryType != territoryType) || forceZoneChange;
         var leftHousingInterior = wasInHousingInterior && !isInHousingInterior;
         var enteredHousingInterior = !wasInHousingInterior && isInHousingInterior;
+        var matchedAutoOnAddress = enteredHousingInterior ? TryEnableAutoOnForCurrentAddress() : null;
+        var waitingForAutoOnAddress = false;
+
+        if (leftHousingInterior)
+        {
+            ClearPendingAutoOn();
+        }
+
+        if (enteredHousingInterior && matchedAutoOnAddress is null && ShouldCheckAutoOnAddresses())
+        {
+            pendingAutoOnCheckUntil = DateTimeOffset.Now.AddSeconds(5);
+            pendingAutoOnEnteringAutoOff = configuration.AutoDisableOnEnteringHousingInterior;
+            waitingForAutoOnAddress = true;
+        }
+
         var autoOffReason = GetAutoDisableReason(
             territoryChanged,
             forceZoneChange,
             leftHousingInterior,
             enteredHousingInterior,
+            matchedAutoOnAddress is not null || waitingForAutoOnAddress,
             isInResidentialArea);
 
         if (autoOffReason is not null && HasEnabledModules())
@@ -972,6 +1196,50 @@ internal sealed partial class RollTrackerService : IDisposable
         lastAutoOffTransitionWasHousingInteriorMove = leftHousingInterior || enteredHousingInterior;
         wasInHousingInterior = isInHousingInterior;
         wasInResidentialArea = isInResidentialArea;
+    }
+
+    private void ProcessPendingAutoOn(DateTimeOffset now)
+    {
+        if (pendingAutoOnCheckUntil is null)
+        {
+            return;
+        }
+
+        if (!IsHousingInterior(clientState.TerritoryType))
+        {
+            ClearPendingAutoOn();
+            return;
+        }
+
+        if (TryEnableAutoOnForCurrentAddress() is not null)
+        {
+            ClearPendingAutoOn();
+            return;
+        }
+
+        if (now < pendingAutoOnCheckUntil.Value)
+        {
+            return;
+        }
+
+        var shouldRunDeferredEnteringAutoOff =
+            pendingAutoOnEnteringAutoOff &&
+            configuration.AutoDisableWhenLeavingHousing &&
+            configuration.AutoDisableOnEnteringHousingInterior &&
+            HasEnabledModules();
+
+        ClearPendingAutoOn();
+
+        if (shouldRunDeferredEnteringAutoOff)
+        {
+            DisableModulesForAutoOff("you entered the house");
+        }
+    }
+
+    private void ClearPendingAutoOn()
+    {
+        pendingAutoOnCheckUntil = null;
+        pendingAutoOnEnteringAutoOff = false;
     }
 
     private bool IsBetweenAreas()
@@ -994,6 +1262,7 @@ internal sealed partial class RollTrackerService : IDisposable
         bool forceZoneChange,
         bool leftHousingInterior,
         bool enteredHousingInterior,
+        bool enteredSavedAutoOnAddress,
         bool isInResidentialArea)
     {
         if (!configuration.AutoDisableWhenLeavingHousing)
@@ -1006,7 +1275,7 @@ internal sealed partial class RollTrackerService : IDisposable
             return "you left the house";
         }
 
-        if (configuration.AutoDisableOnEnteringHousingInterior && enteredHousingInterior)
+        if (configuration.AutoDisableOnEnteringHousingInterior && enteredHousingInterior && !enteredSavedAutoOnAddress)
         {
             return "you entered the house";
         }
@@ -1026,6 +1295,41 @@ internal sealed partial class RollTrackerService : IDisposable
         }
 
         return null;
+    }
+
+    private bool ShouldCheckAutoOnAddresses()
+    {
+        return configuration.AutoEnableWhenEnteringHousing &&
+            configuration.AutoOnHousingAddresses is { Count: > 0 } &&
+            configuration.AutoOnHousingAddresses.Any(address => address.Enabled);
+    }
+
+    private HousingAddressEntry? GetCurrentAutoOnAddressMatch()
+    {
+        if (!TryCreateCurrentHousingAddressEntry(string.Empty, out var currentAddress, out _))
+        {
+            return null;
+        }
+
+        return configuration.AutoOnHousingAddresses.FirstOrDefault(address =>
+            address.Enabled &&
+            IsSameHousingAddress(address, currentAddress));
+    }
+
+    private HousingAddressEntry? TryEnableAutoOnForCurrentAddress()
+    {
+        if (!ShouldCheckAutoOnAddresses())
+        {
+            return null;
+        }
+
+        var matchedAddress = GetCurrentAutoOnAddressMatch();
+        if (matchedAddress is not null)
+        {
+            EnableModulesForAutoOn(matchedAddress);
+        }
+
+        return matchedAddress;
     }
 
     private bool HasEnabledModules()
@@ -1090,6 +1394,67 @@ internal sealed partial class RollTrackerService : IDisposable
 
         saveConfiguration();
         chatGui.Print($"RollTracker disabled because {reason}.", "RollTracker");
+    }
+
+    private void EnableModulesForAutoOn(HousingAddressEntry address)
+    {
+        var changed = false;
+
+        if (configuration.AutoEnableAffectsTod && !configuration.Enabled)
+        {
+            configuration.Enabled = true;
+            changed = true;
+        }
+
+        if (configuration.AutoEnableAffectsTodSecondPair && !configuration.TodSecondPairEnabled)
+        {
+            configuration.TodSecondPairEnabled = true;
+            changed = true;
+        }
+
+        if (configuration.AutoEnableAffectsTodSpecialRules && !configuration.TodSpecialRulesEnabled)
+        {
+            configuration.TodSpecialRulesEnabled = true;
+            changed = true;
+        }
+
+        if (configuration.AutoEnableAffectsTruth && !configuration.TruthTriggerEnabled)
+        {
+            configuration.TruthTriggerEnabled = true;
+            changed = true;
+        }
+
+        if (configuration.AutoEnableAffectsDare && !configuration.DareTriggerEnabled)
+        {
+            configuration.DareTriggerEnabled = true;
+            changed = true;
+        }
+
+        if (configuration.AutoEnableAffectsHelp && !configuration.HelpTriggerEnabled)
+        {
+            configuration.HelpTriggerEnabled = true;
+            changed = true;
+        }
+
+        if (configuration.AutoEnableAffectsChatAlias && !configuration.ChatAliasEnabled)
+        {
+            configuration.ChatAliasEnabled = true;
+            changed = true;
+        }
+
+        if (configuration.AutoEnableAffectsWifi && !configuration.WifiEnabled)
+        {
+            configuration.WifiEnabled = true;
+            changed = true;
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        saveConfiguration();
+        chatGui.Print($"RollTracker enabled for saved address: {address.Name}.", "RollTracker");
     }
 
     private static HashSet<uint> CreateDefaultResidentialTerritoryIds()
@@ -2005,6 +2370,36 @@ internal sealed partial class RollTrackerService : IDisposable
         ];
     }
 
+    private static Dictionary<ushort, WorldDebugInfo> BuildWorldInfos(IDataManager dataManager)
+    {
+        return dataManager.GetExcelSheet<World>()?
+            .Select(row =>
+            {
+                var worldName = row.Name.ToString().Trim();
+                var dataCenterName = row.DataCenter.ValueNullable?.Name.ToString().Trim() ?? string.Empty;
+                return new WorldDebugInfo((ushort)row.RowId, worldName, dataCenterName);
+            })
+            .Where(info => !string.IsNullOrWhiteSpace(info.WorldName))
+            .ToDictionary(info => info.WorldId, info => info) ?? [];
+    }
+
+    private static Dictionary<uint, string> BuildTerritoryNames(IDataManager dataManager)
+    {
+        return dataManager.GetExcelSheet<TerritoryType>()?
+            .Select(row =>
+            {
+                var placeName = row.PlaceName.ValueNullable?.NameNoArticle.ToString().Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(placeName))
+                {
+                    placeName = row.PlaceName.ValueNullable?.Name.ToString().Trim() ?? string.Empty;
+                }
+
+                return (row.RowId, PlaceName: placeName);
+            })
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.PlaceName))
+            .ToDictionary(entry => entry.RowId, entry => entry.PlaceName) ?? [];
+    }
+
     private static bool IsAllowedRollRange(Match match)
     {
         if (!match.Groups["min"].Success && !match.Groups["max"].Success)
@@ -2065,6 +2460,31 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly record struct RoundResultCommand(string Command, bool IsSpecialRule);
 
     private readonly record struct HelpCommandInfo(string Command, bool Enabled);
+
+    internal readonly record struct HousingDebugInfo(
+        uint TerritoryType,
+        bool IsHousingInterior,
+        bool IsResidentialArea,
+        bool IsBetweenAreas,
+        bool HasHousingManager,
+        string HousingTerritoryType,
+        sbyte Ward,
+        sbyte Plot,
+        byte Division,
+        short Room,
+        string CurrentHouseId,
+        string CurrentIndoorHouseId,
+        uint OriginalHouseTerritoryTypeId,
+        bool HasHousePermissions,
+        ushort WorldId,
+        string WorldName,
+        string DataCenterName,
+        string DistrictName,
+        string CurrentLocationPreview,
+        string AddressPreview,
+        bool HasReliableInteriorAddress);
+
+    private readonly record struct WorldDebugInfo(ushort WorldId, string WorldName, string DataCenterName);
 
     private enum RoundKind
     {

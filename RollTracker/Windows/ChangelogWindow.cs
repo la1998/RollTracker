@@ -17,6 +17,24 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.60", """
+Auto On improvements:
+- Added a housing address book for Auto On.
+- Saved housing interiors can now automatically turn selected modules back on when entered.
+- Added separate Auto On affected modules so Auto On and Auto Off can manage different module sets.
+- Added separate Enable Auto On and Enable Auto Off settings.
+- Saved Auto On addresses skip the Entering house interior Auto Off trigger to avoid immediately turning modules off again.
+- Added delayed Auto On matching after entering an interior so housing data can settle before matching the saved address.
+
+Auto On/Off UI:
+- Renamed the Advanced tab from Auto Off to Auto On/Off.
+- Split Auto On and Auto Off into separate subtabs.
+- Moved housing debug details out of the Auto On/Off tab.
+- Added a title bar bug icon that opens a dedicated RollTracker Debug Info window.
+
+Chat Alias improvements:
+- Added one-click controls to turn all Chat Alias feedback toggles on or off while keeping individual row toggles editable.
+"""),
         new("0.1.0.59", """
 Chat Alias improvements:
 - Added optional chat feedback for Chat Alias commands.

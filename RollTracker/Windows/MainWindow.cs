@@ -6,6 +6,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
@@ -112,6 +113,7 @@ internal sealed class MainWindow : Window, IDisposable
     private readonly Action saveConfiguration;
     private readonly Action openRollHistoryWindow;
     private readonly Action openChangelogWindow;
+    private readonly Action openHousingDebugWindow;
 
     private string newTruthPrompt = string.Empty;
     private string newDarePrompt = string.Empty;
@@ -129,6 +131,7 @@ internal sealed class MainWindow : Window, IDisposable
     private string newSpecialRuleText = string.Empty;
     private int selectedChatAliasCommandIndex;
     private string newChatAliasTriggerText = string.Empty;
+    private string newHousingAddressName = string.Empty;
 
     public MainWindow(
         RollTrackerService rollTrackerService,
@@ -137,7 +140,8 @@ internal sealed class MainWindow : Window, IDisposable
         IChatGui chatGui,
         Action saveConfiguration,
         Action openRollHistoryWindow,
-        Action openChangelogWindow)
+        Action openChangelogWindow,
+        Action openHousingDebugWindow)
         : base("RollTracker##RollTrackerMainWindow")
     {
         this.rollTrackerService = rollTrackerService;
@@ -147,6 +151,7 @@ internal sealed class MainWindow : Window, IDisposable
         this.saveConfiguration = saveConfiguration;
         this.openRollHistoryWindow = openRollHistoryWindow;
         this.openChangelogWindow = openChangelogWindow;
+        this.openHousingDebugWindow = openHousingDebugWindow;
 
         Flags = ImGuiWindowFlags.None;
         SizeConstraints = new WindowSizeConstraints
@@ -154,6 +159,14 @@ internal sealed class MainWindow : Window, IDisposable
             MinimumSize = new Vector2(760, 500),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
         };
+        TitleBarButtons.Add(new TitleBarButton
+        {
+            Icon = FontAwesomeIcon.Bug,
+            IconColor = DangerColor,
+            Priority = int.MaxValue,
+            ShowTooltip = () => ImGui.SetTooltip("Open RollTracker debug info."),
+            Click = _ => openHousingDebugWindow(),
+        });
     }
 
     public void Dispose()
@@ -326,7 +339,7 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.BeginDisabled();
         }
 
-        if (ImGui.BeginTabItem("Auto Off"))
+        if (ImGui.BeginTabItem("Auto On/Off"))
         {
             DrawAutoOffTab();
             ImGui.EndTabItem();
@@ -335,7 +348,7 @@ internal sealed class MainWindow : Window, IDisposable
         if (!configuration.AdvancedMode)
         {
             ImGui.EndDisabled();
-            DrawAdvancedModeOnlyTooltip("Enable Advanced mode in Settings to use Auto Off settings.");
+            DrawAdvancedModeOnlyTooltip("Enable Advanced mode in Settings to use Auto On/Off settings.");
         }
     }
 
@@ -352,7 +365,7 @@ internal sealed class MainWindow : Window, IDisposable
         DrawNavButton(Page.CommandHelp, "Command Help");
         DrawNavButton(Page.ChatAlias, "Chat Alias");
         DrawNavButton(Page.Wifi, "Shell Infos");
-        DrawNavButton(Page.AutoOff, "Auto Off", configuration.AdvancedMode);
+        DrawNavButton(Page.AutoOff, "Auto On/Off", configuration.AdvancedMode);
 
         var bottomButtonHeight = ImGui.GetFrameHeightWithSpacing() + ImGui.GetStyle().ItemSpacing.Y + 2 * ImGuiHelpers.GlobalScale;
         var remainingHeight = ImGui.GetContentRegionAvail().Y - bottomButtonHeight;
@@ -395,7 +408,7 @@ internal sealed class MainWindow : Window, IDisposable
         if (!enabled)
         {
             ImGui.EndDisabled();
-            DrawAdvancedModeOnlyTooltip("Enable Advanced mode in Settings to use Auto Off settings.");
+            DrawAdvancedModeOnlyTooltip("Enable Advanced mode in Settings to use Auto On/Off settings.");
         }
     }
 
@@ -448,7 +461,7 @@ internal sealed class MainWindow : Window, IDisposable
             Page.CommandHelp => "Command Help",
             Page.ChatAlias => "Chat Alias",
             Page.Wifi => "Shell Infos",
-            Page.AutoOff => "Auto Off",
+            Page.AutoOff => "Auto On/Off",
             Page.Settings => "Settings",
             _ => "RollTracker",
         };
@@ -958,7 +971,7 @@ internal sealed class MainWindow : Window, IDisposable
         DrawSettingsSection("Wifi");
         DrawModuleToggle("Enable Wifi", configuration.WifiEnabled, rollTrackerService.SetWifiEnabled);
 
-        DrawSettingsSection("Auto Off");
+        DrawSettingsSection("Auto On/Off");
         DrawAutoOffSettingsSummary();
 
         DrawSettingsSection("Global");
@@ -2101,7 +2114,36 @@ internal sealed class MainWindow : Window, IDisposable
 
     private void DrawAutoOffTab()
     {
-        BeginPanel("Auto Off", Vector2.Zero);
+        var housingInfo = rollTrackerService.GetCurrentHousingDebugInfo();
+
+        BeginPanel("Auto On/Off", Vector2.Zero);
+        ImGui.TextColored(DangerColor, "This is a safety feature. Change it at your own risk.");
+        ImGui.Spacing();
+
+        if (!ImGui.BeginTabBar("RollTrackerAutoOnOffTabs"))
+        {
+            EndPanel();
+            return;
+        }
+
+        if (ImGui.BeginTabItem("Auto Off"))
+        {
+            DrawAutoOffSubtab();
+            ImGui.EndTabItem();
+        }
+
+        if (ImGui.BeginTabItem("Auto On"))
+        {
+            DrawAutoOnSubtab(housingInfo);
+            ImGui.EndTabItem();
+        }
+
+        ImGui.EndTabBar();
+        EndPanel();
+    }
+
+    private void DrawAutoOffSubtab()
+    {
         DrawSectionTitle("Triggers");
         var disableOnLeavingHousingInterior = configuration.AutoDisableOnLeavingHousingInterior;
         if (DrawAutoOffTriggerCheckbox("Leaving house interior", ref disableOnLeavingHousingInterior))
@@ -2140,7 +2182,174 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.TextColored(configuration.AutoDisableWhenLeavingHousing ? SuccessColor : MutedColor, configuration.AutoDisableWhenLeavingHousing ? "Auto Off enabled" : "Auto Off disabled");
         ImGui.TextDisabled(GetAutoOffSummaryText());
         ImGui.TextDisabled(GetAutoOffAffectedModulesText());
-        EndPanel();
+    }
+
+    private void DrawAutoOnSubtab(RollTrackerService.HousingDebugInfo housingInfo)
+    {
+        DrawSectionTitle("Auto On affected modules");
+        DrawAutoOnAffectedModules();
+
+        ImGui.Spacing();
+        DrawSectionTitle("Current behavior");
+        ImGui.TextColored(configuration.AutoEnableWhenEnteringHousing ? SuccessColor : MutedColor, configuration.AutoEnableWhenEnteringHousing ? "Auto On enabled" : "Auto On disabled");
+        ImGui.TextDisabled(GetAutoOnAffectedModulesText());
+
+        ImGui.Spacing();
+        DrawSectionTitle("Address book");
+        ImGui.TextDisabled("Saved addresses turn the selected Auto On modules on when you enter that interior.");
+        DrawHousingAddressBook(housingInfo);
+    }
+
+    private void DrawHousingAddressBook(RollTrackerService.HousingDebugInfo housingInfo)
+    {
+        configuration.AutoOnHousingAddresses ??= [];
+
+        ImGui.SetNextItemWidth(260 * ImGuiHelpers.GlobalScale);
+        ImGui.InputText("Address name", ref newHousingAddressName, 80);
+        DrawHelpTooltip("Optional display name for the current interior address.");
+        ImGui.SameLine();
+
+        var canSaveAddress = housingInfo.HasReliableInteriorAddress;
+        if (!canSaveAddress)
+        {
+            ImGui.BeginDisabled();
+        }
+
+        if (ImGui.Button("Add Address", SettingsButtonSize))
+        {
+            if (rollTrackerService.TryCreateCurrentHousingAddressEntry(newHousingAddressName, out var entry, out var message))
+            {
+                var existingIndex = configuration.AutoOnHousingAddresses.FindIndex(existing => RollTrackerService.IsSameHousingAddress(existing, entry));
+                if (existingIndex >= 0)
+                {
+                    configuration.AutoOnHousingAddresses[existingIndex] = entry;
+                }
+                else
+                {
+                    configuration.AutoOnHousingAddresses.Add(entry);
+                }
+
+                newHousingAddressName = string.Empty;
+                saveConfiguration();
+                chatGui.Print(message, "RollTracker");
+            }
+            else
+            {
+                chatGui.PrintError(message, "RollTracker");
+            }
+        }
+
+        if (!canSaveAddress)
+        {
+            ImGui.EndDisabled();
+        }
+
+        DrawHelpTooltip(canSaveAddress
+            ? "Saves the current housing interior address for future Auto On matching."
+            : "Enter a housing interior to save an address.");
+
+        ImGui.TextDisabled($"Current: {(canSaveAddress ? housingInfo.AddressPreview : "Enter a housing interior to save an address.")}");
+
+        var tableHeight = Math.Min(180 * ImGuiHelpers.GlobalScale, Math.Max(90 * ImGuiHelpers.GlobalScale, ImGui.GetContentRegionAvail().Y * 0.35f));
+        if (!ImGui.BeginTable("RollTrackerAutoOnAddressBook", 4, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp, new Vector2(0, tableHeight)))
+        {
+            return;
+        }
+
+        ImGui.TableSetupColumn("On", ImGuiTableColumnFlags.WidthFixed, 42 * ImGuiHelpers.GlobalScale);
+        ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 0, 1);
+        ImGui.TableSetupColumn("Address", ImGuiTableColumnFlags.WidthStretch, 0, 2);
+        ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 82 * ImGuiHelpers.GlobalScale);
+        ImGui.TableHeadersRow();
+
+        for (var i = 0; i < configuration.AutoOnHousingAddresses.Count; i++)
+        {
+            var address = configuration.AutoOnHousingAddresses[i];
+            ImGui.PushID($"AutoOnAddress{i}");
+            ImGui.TableNextRow();
+
+            ImGui.TableNextColumn();
+            var enabled = address.Enabled;
+            if (ImGui.Checkbox("##Enabled", ref enabled))
+            {
+                address.Enabled = enabled;
+                configuration.AutoOnHousingAddresses[i] = address;
+                saveConfiguration();
+            }
+
+            ImGui.TableNextColumn();
+            var name = address.Name;
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.InputText("##Name", ref name, 80))
+            {
+                address.Name = name.Trim();
+                configuration.AutoOnHousingAddresses[i] = address;
+                saveConfiguration();
+            }
+
+            ImGui.TableNextColumn();
+            ImGui.TextWrapped(string.IsNullOrWhiteSpace(address.Address) ? "-" : address.Address);
+
+            ImGui.TableNextColumn();
+            if (ImGui.Button("Delete", new Vector2(-1, 0)))
+            {
+                configuration.AutoOnHousingAddresses.RemoveAt(i);
+                saveConfiguration();
+                ImGui.PopID();
+                break;
+            }
+
+            ImGui.PopID();
+        }
+
+        ImGui.EndTable();
+    }
+
+    private void DrawCurrentHousingInfo(RollTrackerService.HousingDebugInfo housingInfo)
+    {
+        DrawDebugInfoLine("Territory ID", housingInfo.TerritoryType.ToString());
+        DrawDebugInfoLine("Current location", housingInfo.CurrentLocationPreview);
+        DrawDebugInfoLine("Interior address reliable", housingInfo.HasReliableInteriorAddress ? "Yes" : "No");
+        DrawDebugInfoLine("Interior address preview", housingInfo.AddressPreview);
+        DrawDebugInfoLine("Data center", housingInfo.DataCenterName);
+        DrawDebugInfoLine("World", $"{housingInfo.WorldName} ({housingInfo.WorldId})");
+        DrawDebugInfoLine("District", housingInfo.DistrictName);
+        DrawDebugInfoLine("Housing interior", housingInfo.IsHousingInterior ? "Yes" : "No");
+        DrawDebugInfoLine("Residential area", housingInfo.IsResidentialArea ? "Yes" : "No");
+        DrawDebugInfoLine("Between areas", housingInfo.IsBetweenAreas ? "Yes" : "No");
+        DrawDebugInfoLine("Housing manager", housingInfo.HasHousingManager ? "Available" : "Unavailable");
+        DrawDebugInfoLine("Housing territory type", string.IsNullOrWhiteSpace(housingInfo.HousingTerritoryType) ? "-" : housingInfo.HousingTerritoryType);
+        DrawDebugInfoLine("Ward", $"{FormatDisplayIndex(housingInfo.Ward)} (raw {FormatSignedDebugValue(housingInfo.Ward)})");
+        DrawDebugInfoLine("Plot", $"{FormatDisplayIndex(housingInfo.Plot)} (raw {FormatSignedDebugValue(housingInfo.Plot)})");
+        DrawDebugInfoLine("Division", housingInfo.Division.ToString());
+        DrawDebugInfoLine("Room", FormatSignedDebugValue(housingInfo.Room));
+        DrawDebugInfoLine("Current house ID", string.IsNullOrWhiteSpace(housingInfo.CurrentHouseId) ? "-" : housingInfo.CurrentHouseId);
+        DrawDebugInfoLine("Current indoor house ID", string.IsNullOrWhiteSpace(housingInfo.CurrentIndoorHouseId) ? "-" : housingInfo.CurrentIndoorHouseId);
+        DrawDebugInfoLine("Original house territory ID", housingInfo.OriginalHouseTerritoryTypeId.ToString());
+        DrawDebugInfoLine("House permissions", housingInfo.HasHousePermissions ? "Yes" : "No");
+    }
+
+    private static void DrawDebugInfoLine(string label, string value)
+    {
+        ImGui.TextDisabled($"{label}:");
+        ImGui.SameLine(190 * ImGuiHelpers.GlobalScale);
+        ImGui.TextUnformatted(value);
+    }
+
+    private static string FormatSignedDebugValue<T>(T value)
+        where T : struct, IConvertible
+    {
+        var rawValue = Convert.ToInt64(value);
+        return rawValue == sbyte.MinValue || rawValue == short.MinValue
+            ? "-"
+            : rawValue.ToString();
+    }
+
+    private static string FormatDisplayIndex<T>(T value)
+        where T : struct, IConvertible
+    {
+        var rawValue = Convert.ToInt64(value);
+        return rawValue < 0 ? "-" : (rawValue + 1).ToString();
     }
 
     private void DrawAutoOffAffectedModules()
@@ -2202,9 +2411,69 @@ internal sealed class MainWindow : Window, IDisposable
         }
     }
 
+    private void DrawAutoOnAffectedModules()
+    {
+        var affectsTod = configuration.AutoEnableAffectsTod;
+        if (DrawAutoOffTriggerCheckbox("ToD##AutoOnAffectsTod", ref affectsTod))
+        {
+            configuration.AutoEnableAffectsTod = affectsTod;
+            saveConfiguration();
+        }
+
+        var affectsTodSecondPair = configuration.AutoEnableAffectsTodSecondPair;
+        if (DrawAutoOffTriggerCheckbox("ToD - Doubles##AutoOnAffectsTodSecondPair", ref affectsTodSecondPair))
+        {
+            configuration.AutoEnableAffectsTodSecondPair = affectsTodSecondPair;
+            saveConfiguration();
+        }
+
+        var affectsTodSpecialRules = configuration.AutoEnableAffectsTodSpecialRules;
+        if (DrawAutoOffTriggerCheckbox("ToD special rules##AutoOnAffectsTodSpecialRules", ref affectsTodSpecialRules))
+        {
+            configuration.AutoEnableAffectsTodSpecialRules = affectsTodSpecialRules;
+            saveConfiguration();
+        }
+
+        var affectsTruth = configuration.AutoEnableAffectsTruth;
+        if (DrawAutoOffTriggerCheckbox("!truth##AutoOnAffectsTruth", ref affectsTruth))
+        {
+            configuration.AutoEnableAffectsTruth = affectsTruth;
+            saveConfiguration();
+        }
+
+        var affectsDare = configuration.AutoEnableAffectsDare;
+        if (DrawAutoOffTriggerCheckbox("!dare##AutoOnAffectsDare", ref affectsDare))
+        {
+            configuration.AutoEnableAffectsDare = affectsDare;
+            saveConfiguration();
+        }
+
+        var affectsHelp = configuration.AutoEnableAffectsHelp;
+        if (DrawAutoOffTriggerCheckbox("!help##AutoOnAffectsHelp", ref affectsHelp))
+        {
+            configuration.AutoEnableAffectsHelp = affectsHelp;
+            saveConfiguration();
+        }
+
+        var affectsChatAlias = configuration.AutoEnableAffectsChatAlias;
+        if (DrawAutoOffTriggerCheckbox("Chat Alias##AutoOnAffectsChatAlias", ref affectsChatAlias))
+        {
+            configuration.AutoEnableAffectsChatAlias = affectsChatAlias;
+            saveConfiguration();
+        }
+
+        var affectsWifi = configuration.AutoEnableAffectsWifi;
+        if (DrawAutoOffTriggerCheckbox("!wifi##AutoOnAffectsWifi", ref affectsWifi))
+        {
+            configuration.AutoEnableAffectsWifi = affectsWifi;
+            saveConfiguration();
+        }
+    }
+
     private void DrawAutoOffSettingsSummary()
     {
         DrawAutoOffMasterCheckbox("Enable Auto Off");
+        DrawAutoOnMasterCheckbox("Enable Auto On");
     }
 
     private void DrawChatAliasWakeToggle()
@@ -2225,6 +2494,16 @@ internal sealed class MainWindow : Window, IDisposable
         if (ImGui.Checkbox(label, ref autoDisableWhenLeavingHousing))
         {
             configuration.AutoDisableWhenLeavingHousing = autoDisableWhenLeavingHousing;
+            saveConfiguration();
+        }
+    }
+
+    private void DrawAutoOnMasterCheckbox(string label)
+    {
+        var autoEnableWhenEnteringHousing = configuration.AutoEnableWhenEnteringHousing;
+        if (ImGui.Checkbox(label, ref autoEnableWhenEnteringHousing))
+        {
+            configuration.AutoEnableWhenEnteringHousing = autoEnableWhenEnteringHousing;
             saveConfiguration();
         }
     }
@@ -2310,6 +2589,54 @@ internal sealed class MainWindow : Window, IDisposable
             : $"Affected modules: {string.Join(", ", modules)}";
     }
 
+    private string GetAutoOnAffectedModulesText()
+    {
+        var modules = new List<string>();
+        if (configuration.AutoEnableAffectsTod)
+        {
+            modules.Add("ToD");
+        }
+
+        if (configuration.AutoEnableAffectsTodSecondPair)
+        {
+            modules.Add("ToD - Doubles");
+        }
+
+        if (configuration.AutoEnableAffectsTodSpecialRules)
+        {
+            modules.Add("ToD special rules");
+        }
+
+        if (configuration.AutoEnableAffectsTruth)
+        {
+            modules.Add("!truth");
+        }
+
+        if (configuration.AutoEnableAffectsDare)
+        {
+            modules.Add("!dare");
+        }
+
+        if (configuration.AutoEnableAffectsHelp)
+        {
+            modules.Add("!help");
+        }
+
+        if (configuration.AutoEnableAffectsChatAlias)
+        {
+            modules.Add("Chat Alias");
+        }
+
+        if (configuration.AutoEnableAffectsWifi)
+        {
+            modules.Add("!wifi");
+        }
+
+        return modules.Count == 0
+            ? "Auto On modules: none"
+            : $"Auto On modules: {string.Join(", ", modules)}";
+    }
+
     private void DrawChatAliasContent(string id, bool legacyStyle)
     {
         configuration.ChatAliasCommands ??= [];
@@ -2327,10 +2654,44 @@ internal sealed class MainWindow : Window, IDisposable
         DrawChatChannelCombo("Feedback chat", configuration.ChatAliasFeedbackChatChannel, channel => configuration.ChatAliasFeedbackChatChannel = channel);
         DrawHelpTooltip("Alias rows with Feedback enabled send their status message to this chat channel.");
 
+        ImGui.SameLine();
+        if (ImGui.Button($"All feedback on##{id}ChatAliasFeedbackAllOn", new Vector2(130 * ImGuiHelpers.GlobalScale, 0)))
+        {
+            SetAllChatAliasFeedback(true);
+        }
+
+        ImGui.SameLine();
+        if (ImGui.Button($"All feedback off##{id}ChatAliasFeedbackAllOff", new Vector2(130 * ImGuiHelpers.GlobalScale, 0)))
+        {
+            SetAllChatAliasFeedback(false);
+        }
+
         ImGui.Spacing();
         DrawChatAliasAddRow(id);
         ImGui.Separator();
         DrawChatAliasCommandTable(id, legacyStyle);
+    }
+
+    private void SetAllChatAliasFeedback(bool enabled)
+    {
+        var changed = false;
+        for (var i = 0; i < configuration.ChatAliasCommands.Count; i++)
+        {
+            var aliasCommand = configuration.ChatAliasCommands[i];
+            if (aliasCommand.FeedbackEnabled == enabled)
+            {
+                continue;
+            }
+
+            aliasCommand.FeedbackEnabled = enabled;
+            configuration.ChatAliasCommands[i] = aliasCommand;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            saveConfiguration();
+        }
     }
 
     private void DrawChatAliasAddRow(string id)
@@ -2941,7 +3302,7 @@ internal sealed class MainWindow : Window, IDisposable
         DrawModuleToggle("Enable !wifi", configuration.WifiEnabled, rollTrackerService.SetWifiEnabled);
 
         ImGui.Spacing();
-        DrawSectionTitle("Auto Off");
+        DrawSectionTitle("Auto On/Off");
         DrawAutoOffSettingsSummary();
         EndPanel();
 

@@ -27,6 +27,8 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool AutoDisableWhenLeavingHousing { get; set; } = true;
 
+    public bool AutoEnableWhenEnteringHousing { get; set; } = true;
+
     public bool AutoDisableOnLeavingHousingInterior { get; set; } = true;
 
     public bool AutoDisableOnEnteringHousingInterior { get; set; }
@@ -50,6 +52,24 @@ public sealed class Configuration : IPluginConfiguration
     public bool AutoDisableAffectsChatAlias { get; set; } = true;
 
     public bool AutoDisableAffectsWifi { get; set; } = true;
+
+    public bool AutoEnableAffectsTod { get; set; } = true;
+
+    public bool AutoEnableAffectsTodSecondPair { get; set; } = true;
+
+    public bool AutoEnableAffectsTodSpecialRules { get; set; } = true;
+
+    public bool AutoEnableAffectsTruth { get; set; } = true;
+
+    public bool AutoEnableAffectsDare { get; set; } = true;
+
+    public bool AutoEnableAffectsHelp { get; set; } = true;
+
+    public bool AutoEnableAffectsChatAlias { get; set; } = true;
+
+    public bool AutoEnableAffectsWifi { get; set; } = true;
+
+    public List<HousingAddressEntry> AutoOnHousingAddresses { get; set; } = [];
 
     public bool AdvancedMode { get; set; }
 
@@ -253,4 +273,37 @@ public sealed class ChatAliasCommand
     public string TriggerText { get; set; } = string.Empty;
 
     public string RtCommandArgs { get; set; } = string.Empty;
+}
+
+public sealed class HousingAddressEntry
+{
+    public bool Enabled { get; set; } = true;
+
+    public string Name { get; set; } = string.Empty;
+
+    public string Address { get; set; } = string.Empty;
+
+    public string DataCenterName { get; set; } = string.Empty;
+
+    public string WorldName { get; set; } = string.Empty;
+
+    public ushort WorldId { get; set; }
+
+    public string DistrictName { get; set; } = string.Empty;
+
+    public uint TerritoryTypeId { get; set; }
+
+    public uint OriginalHouseTerritoryTypeId { get; set; }
+
+    public sbyte WardIndex { get; set; }
+
+    public sbyte PlotIndex { get; set; }
+
+    public byte Division { get; set; }
+
+    public short RoomNumber { get; set; }
+
+    public bool IsApartment { get; set; }
+
+    public ulong HouseId { get; set; }
 }
