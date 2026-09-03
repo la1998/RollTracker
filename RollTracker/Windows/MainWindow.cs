@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -37,6 +38,12 @@ internal sealed class MainWindow : Window, IDisposable
         "Standard",
         "Compact",
         "Macro Mode",
+    ];
+    private static readonly string[] HonorificPositionNames =
+    [
+        "Title",
+        "Prefix",
+        "Suffix",
     ];
     private static readonly string[] StandardHelpCommands =
     [
@@ -92,6 +99,15 @@ internal sealed class MainWindow : Window, IDisposable
         "{!wifi} !wifi - Show the Shells and Discord info.\n\n" +
         "{!tod}!tod - Start a Truth or Dare roll round. {!tod2} !tod2 - Start a second-pair Truth or Dare roll round. {!truth}!truth - Send a random Truth prompt. {!dare}!dare - Send a random Dare prompt. {!wifi} !wifi - Show the Shells and Discord info.";
 
+    private const string WifiMacroPlaceholder =
+        "(Venue name) Shells and Discord:\n" +
+        "Lightless - our main sync:\n" +
+        "ID: LLS-XXXXXXXXXXXX PW: *************\n\n" +
+        "(sync plugin name) - our optional/backup sync:\n" +
+        "ID: XXX-XXXXXXXXXX PW: XXXXXXXXXX\n\n" +
+        "Discord:\n" +
+        "(Static Discord invite link)";
+
     private static Vector4 AccentColor = new(0.42f, 0.72f, 1.00f, 1.00f);
     private static Vector4 SuccessColor = new(0.46f, 0.86f, 0.58f, 1.00f);
     private static Vector4 WarningColor = new(1.00f, 0.72f, 0.35f, 1.00f);
@@ -132,6 +148,10 @@ internal sealed class MainWindow : Window, IDisposable
     private int selectedChatAliasCommandIndex;
     private string newChatAliasTriggerText = string.Empty;
     private string newHousingAddressName = string.Empty;
+    private float autoOnAddressBookTableHeight = 180f;
+    private float moodleStatusEffectTableHeight = 160f;
+    private float honorificStatusEffectTableHeight = 190f;
+    private float statusEffectMacroTableHeight = 240f;
 
     public MainWindow(
         RollTrackerService rollTrackerService,
@@ -267,6 +287,12 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.EndTabItem();
         }
 
+        if (ImGui.BeginTabItem("Status Effects"))
+        {
+            DrawStatusEffectsTab();
+            ImGui.EndTabItem();
+        }
+
         DrawAutoOffTabItem();
 
         if (ImGui.BeginTabItem("Settings"))
@@ -321,6 +347,12 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.EndTabItem();
         }
 
+        if (ImGui.BeginTabItem("Status Effects"))
+        {
+            DrawStatusEffectsTab();
+            ImGui.EndTabItem();
+        }
+
         DrawAutoOffTabItem();
 
         if (ImGui.BeginTabItem("Settings"))
@@ -365,6 +397,7 @@ internal sealed class MainWindow : Window, IDisposable
         DrawNavButton(Page.CommandHelp, "Command Help");
         DrawNavButton(Page.ChatAlias, "Chat Alias");
         DrawNavButton(Page.Wifi, "Shell Infos");
+        DrawNavButton(Page.StatusEffects, "Status Effects");
         DrawNavButton(Page.AutoOff, "Auto On/Off", configuration.AdvancedMode);
 
         var bottomButtonHeight = ImGui.GetFrameHeightWithSpacing() + ImGui.GetStyle().ItemSpacing.Y + 2 * ImGuiHelpers.GlobalScale;
@@ -434,6 +467,9 @@ internal sealed class MainWindow : Window, IDisposable
             case Page.Wifi:
                 DrawWifiTab();
                 break;
+            case Page.StatusEffects:
+                DrawStatusEffectsTab();
+                break;
             case Page.AutoOff:
                 if (configuration.AdvancedMode)
                 {
@@ -461,6 +497,7 @@ internal sealed class MainWindow : Window, IDisposable
             Page.CommandHelp => "Command Help",
             Page.ChatAlias => "Chat Alias",
             Page.Wifi => "Shell Infos",
+            Page.StatusEffects => "Status Effects",
             Page.AutoOff => "Auto On/Off",
             Page.Settings => "Settings",
             _ => "RollTracker",
@@ -916,6 +953,10 @@ internal sealed class MainWindow : Window, IDisposable
             configuration.WifiMacroText = wifiMacroText;
             saveConfiguration();
         }
+        if (string.IsNullOrWhiteSpace(wifiMacroText))
+        {
+            DrawMultilineInputPlaceholder(WifiMacroPlaceholder);
+        }
 
         if (ImGui.Button("Run !wifi"))
         {
@@ -944,16 +985,12 @@ internal sealed class MainWindow : Window, IDisposable
         DrawModuleToggle("Enable ToD", configuration.Enabled, rollTrackerService.SetEnabled);
         DrawModuleToggle("Enable ToD - Doubles", configuration.TodSecondPairEnabled, rollTrackerService.SetSecondPairEnabled);
 
-        var todSpecialRulesEnabled = configuration.TodSpecialRulesEnabled;
-        if (ImGui.Checkbox("Enable ToD special rules", ref todSpecialRulesEnabled))
-        {
-            configuration.TodSpecialRulesEnabled = todSpecialRulesEnabled;
-            saveConfiguration();
-        }
+        DrawModuleToggle("Enable ToD special rules", configuration.TodSpecialRulesEnabled, rollTrackerService.SetTodSpecialRulesEnabled);
 
         DrawSettingsSection("Truth / Dare Suggestions");
         DrawModuleToggle("Enable !truth", configuration.TruthTriggerEnabled, rollTrackerService.SetTruthTriggerEnabled);
         DrawModuleToggle("Enable !dare", configuration.DareTriggerEnabled, rollTrackerService.SetDareTriggerEnabled);
+        DrawSuggestionsLinkToggle();
 
         DrawSettingsSection("General");
         DrawModuleToggle("Enable !help", configuration.HelpTriggerEnabled, rollTrackerService.SetHelpTriggerEnabled);
@@ -2090,12 +2127,706 @@ internal sealed class MainWindow : Window, IDisposable
             configuration.WifiMacroText = wifiMacroText;
             saveConfiguration();
         }
+        if (string.IsNullOrWhiteSpace(wifiMacroText))
+        {
+            DrawMultilineInputPlaceholder(WifiMacroPlaceholder);
+        }
 
         if (ImGui.Button("Run !wifi", new Vector2(140 * ImGuiHelpers.GlobalScale, 0)))
         {
             rollTrackerService.StartWifiMacro("manual");
         }
         EndPanel();
+    }
+
+    private void DrawStatusEffectsTab()
+    {
+        BeginPanel("Status Effects", Vector2.Zero);
+        configuration.ModuleStatusEffects ??= [];
+
+        if (!ImGui.BeginTabBar("RollTrackerStatusEffectsTabs"))
+        {
+            EndPanel();
+            return;
+        }
+
+        if (ImGui.BeginTabItem("Effects"))
+        {
+            DrawStatusEffectsListSubtab();
+            ImGui.EndTabItem();
+        }
+
+        if (!configuration.AdvancedMode)
+        {
+            ImGui.BeginDisabled();
+        }
+
+        if (ImGui.BeginTabItem("Macro Mode"))
+        {
+            DrawStatusEffectsMacroModeSubtab();
+            ImGui.EndTabItem();
+        }
+
+        if (!configuration.AdvancedMode)
+        {
+            ImGui.EndDisabled();
+            DrawAdvancedModeOnlyTooltip("Enable Advanced mode in Settings to use Status Effects Macro Mode.");
+        }
+
+        ImGui.EndTabBar();
+        EndPanel();
+    }
+
+    private void DrawStatusEffectsListSubtab()
+    {
+        DrawSectionTitle("Moodles");
+        ImGui.SameLine();
+        ImGui.TextDisabled("(Requires Moodles to be installed to work)");
+        ImGui.TextDisabled("Applies selected Moodles when linked RollTracker modules turn on, and removes them when they turn off.");
+        if (ImGui.Button("Add Moodle", SettingsButtonSize * ImGuiHelpers.GlobalScale))
+        {
+            configuration.ModuleStatusEffects.Add(new ModuleStatusEffect
+            {
+                Name = $"Moodle {configuration.ModuleStatusEffects.Count(effect => effect.UseMoodle) + 1}",
+                UseMoodle = true,
+                UseHonorific = false,
+            });
+            saveConfiguration();
+        }
+
+        DrawMoodleStatusEffectTable();
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
+        DrawSectionTitle("Honorific");
+        ImGui.SameLine();
+        ImGui.TextDisabled("(Requires Honorific to be installed to work)");
+        ImGui.TextDisabled("Forces a title when linked RollTracker modules turn on, and clears the forced title when they turn off.");
+        if (ImGui.Button("Add Honorific", SettingsButtonSize * ImGuiHelpers.GlobalScale))
+        {
+            var effect = new ModuleStatusEffect
+            {
+                Name = $"Honorific {configuration.ModuleStatusEffects.Count(effect => effect.UseHonorific) + 1}",
+                UseMoodle = false,
+                UseHonorific = true,
+                HonorificPriority = configuration.ModuleStatusEffects.Count(effect => effect.UseHonorific) + 1,
+            };
+            effect.Enabled = !HasEnabledHonorificStatusEffectWithSameModules(effect);
+            configuration.ModuleStatusEffects.Add(effect);
+            saveConfiguration();
+        }
+
+        DrawHonorificStatusEffectTable();
+    }
+
+    private void DrawStatusEffectsMacroModeSubtab()
+    {
+        DrawSectionTitle("Macro Mode");
+        ImGui.TextDisabled("Run custom commands when selected RollTracker modules turn on or off. This can be used to integrate other plugins.");
+
+        configuration.ModuleStatusMacros ??= [];
+        if (ImGui.Button("Add Macro", SettingsButtonSize * ImGuiHelpers.GlobalScale))
+        {
+            configuration.ModuleStatusMacros.Add(new ModuleStatusMacro
+            {
+                Name = $"Macro {configuration.ModuleStatusMacros.Count + 1}",
+            });
+            saveConfiguration();
+        }
+
+        ImGui.Spacing();
+        DrawStatusEffectMacroTable();
+    }
+
+    private void DrawStatusEffectMacroTable()
+    {
+        var scale = ImGuiHelpers.GlobalScale;
+        var resizeHandleHeight = 7 * scale;
+        var minTableHeight = 160 * scale;
+        var maxTableHeight = Math.Max(minTableHeight, ImGui.GetContentRegionAvail().Y - resizeHandleHeight - ImGui.GetStyle().ItemSpacing.Y);
+        statusEffectMacroTableHeight = Math.Clamp(statusEffectMacroTableHeight, minTableHeight, maxTableHeight);
+        const ImGuiTableFlags tableFlags =
+            ImGuiTableFlags.BordersInnerV |
+            ImGuiTableFlags.ScrollY |
+            ImGuiTableFlags.Resizable |
+            ImGuiTableFlags.SizingStretchProp;
+        if (!ImGui.BeginTable("RollTrackerStatusEffectMacrosTable", 6, tableFlags, new Vector2(0, statusEffectMacroTableHeight)))
+        {
+            return;
+        }
+
+        ImGui.TableSetupColumn("On", ImGuiTableColumnFlags.WidthFixed, 42 * scale);
+        ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 0, 1);
+        ImGui.TableSetupColumn("Modules", ImGuiTableColumnFlags.WidthStretch, 0, 1);
+        ImGui.TableSetupColumn("Enable macro", ImGuiTableColumnFlags.WidthStretch, 0, 2);
+        ImGui.TableSetupColumn("Disable macro", ImGuiTableColumnFlags.WidthStretch, 0, 2);
+        ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 82 * scale);
+        ImGui.TableHeadersRow();
+
+        for (var i = 0; i < configuration.ModuleStatusMacros.Count; i++)
+        {
+            var macro = configuration.ModuleStatusMacros[i];
+            ImGui.PushID($"StatusMacro{i}");
+            ImGui.TableNextRow();
+
+            ImGui.TableNextColumn();
+            var enabled = macro.Enabled;
+            if (ImGui.Checkbox("##Enabled", ref enabled))
+            {
+                macro.Enabled = enabled;
+                if (!enabled && HasStatusMacroCommand(macro) && HasAnySelectedStatusMacroModuleEnabled(macro))
+                {
+                    macro.IsApplied = true;
+                }
+
+                configuration.ModuleStatusMacros[i] = macro;
+                saveConfiguration();
+            }
+
+            ImGui.TableNextColumn();
+            var name = macro.Name;
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.InputText("##Name", ref name, 80))
+            {
+                macro.Name = name;
+                configuration.ModuleStatusMacros[i] = macro;
+                saveConfiguration();
+            }
+
+            ImGui.TableNextColumn();
+            DrawStatusMacroModuleCombo(macro, i);
+
+            ImGui.TableNextColumn();
+            var enableMacroText = macro.EnableMacroText;
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.InputTextMultiline("##EnableMacro", ref enableMacroText, 2048, new Vector2(-1, 80 * scale)))
+            {
+                macro.EnableMacroText = enableMacroText;
+                configuration.ModuleStatusMacros[i] = macro;
+                saveConfiguration();
+            }
+            DrawHelpTooltip("Commands to run when the selected modules turn on. /wait lines are supported.");
+
+            ImGui.TableNextColumn();
+            var disableMacroText = macro.DisableMacroText;
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.InputTextMultiline("##DisableMacro", ref disableMacroText, 2048, new Vector2(-1, 80 * scale)))
+            {
+                macro.DisableMacroText = disableMacroText;
+                configuration.ModuleStatusMacros[i] = macro;
+                saveConfiguration();
+            }
+            DrawHelpTooltip("Commands to run when all selected modules are off again. /wait lines are supported.");
+
+            ImGui.TableNextColumn();
+            if (ImGui.Button("Delete", new Vector2(-1, 0)))
+            {
+                configuration.ModuleStatusMacros.RemoveAt(i);
+                saveConfiguration();
+                ImGui.PopID();
+                break;
+            }
+
+            ImGui.PopID();
+        }
+
+        ImGui.EndTable();
+        DrawVerticalResizeHandle(
+            "StatusEffectMacrosResize",
+            ref statusEffectMacroTableHeight,
+            minTableHeight,
+            maxTableHeight,
+            resizeHandleHeight);
+    }
+
+    private void DrawMoodleStatusEffectTable()
+    {
+        var scale = ImGuiHelpers.GlobalScale;
+        var resizeHandleHeight = 7 * scale;
+        var minTableHeight = 110 * scale;
+        var maxTableHeight = Math.Max(minTableHeight, ImGui.GetContentRegionAvail().Y - resizeHandleHeight - ImGui.GetStyle().ItemSpacing.Y);
+        moodleStatusEffectTableHeight = Math.Clamp(moodleStatusEffectTableHeight, minTableHeight, maxTableHeight);
+        var tableHeight = moodleStatusEffectTableHeight;
+        const ImGuiTableFlags tableFlags =
+            ImGuiTableFlags.BordersInnerV |
+            ImGuiTableFlags.ScrollY |
+            ImGuiTableFlags.Resizable |
+            ImGuiTableFlags.SizingStretchProp;
+        if (!ImGui.BeginTable("RollTrackerMoodleStatusEffectsTable", 5, tableFlags, new Vector2(0, tableHeight)))
+        {
+            return;
+        }
+
+        ImGui.TableSetupColumn("On", ImGuiTableColumnFlags.WidthFixed, 42 * ImGuiHelpers.GlobalScale);
+        ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 0, 1);
+        ImGui.TableSetupColumn("Modules", ImGuiTableColumnFlags.WidthStretch, 0, 1);
+        ImGui.TableSetupColumn("Moodle name", ImGuiTableColumnFlags.WidthStretch, 0, 2);
+        ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 82 * ImGuiHelpers.GlobalScale);
+        ImGui.TableHeadersRow();
+
+        for (var i = 0; i < configuration.ModuleStatusEffects.Count; i++)
+        {
+            var effect = configuration.ModuleStatusEffects[i];
+            if (!effect.UseMoodle)
+            {
+                continue;
+            }
+
+            ImGui.PushID($"MoodleEffect{i}");
+            ImGui.TableNextRow();
+            DrawStatusEffectBaseColumns(effect, i);
+
+            ImGui.TableNextColumn();
+            var moodleName = effect.MoodleName;
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.InputText("##MoodleName", ref moodleName, 120))
+            {
+                effect.MoodleName = moodleName;
+                configuration.ModuleStatusEffects[i] = effect;
+                saveConfiguration();
+            }
+            DrawHelpTooltip("Enter the name of the Moodle from your Moodles list that you want to be applied.");
+
+            ImGui.TableNextColumn();
+            if (ImGui.Button("Delete", new Vector2(-1, 0)))
+            {
+                configuration.ModuleStatusEffects.RemoveAt(i);
+                saveConfiguration();
+                ImGui.PopID();
+                break;
+            }
+
+            ImGui.PopID();
+        }
+
+        ImGui.EndTable();
+        DrawVerticalResizeHandle(
+            "MoodleStatusEffectsResize",
+            ref moodleStatusEffectTableHeight,
+            minTableHeight,
+            maxTableHeight,
+            resizeHandleHeight);
+    }
+
+    private void DrawHonorificStatusEffectTable()
+    {
+        var scale = ImGuiHelpers.GlobalScale;
+        var resizeHandleHeight = 7 * scale;
+        var minTableHeight = 120 * scale;
+        var maxTableHeight = Math.Max(minTableHeight, ImGui.GetContentRegionAvail().Y - resizeHandleHeight - ImGui.GetStyle().ItemSpacing.Y);
+        honorificStatusEffectTableHeight = Math.Clamp(honorificStatusEffectTableHeight, minTableHeight, maxTableHeight);
+        var tableHeight = honorificStatusEffectTableHeight;
+        const ImGuiTableFlags tableFlags =
+            ImGuiTableFlags.BordersInnerV |
+            ImGuiTableFlags.ScrollY |
+            ImGuiTableFlags.Resizable |
+            ImGuiTableFlags.SizingStretchProp;
+        if (!ImGui.BeginTable("RollTrackerHonorificStatusEffectsTable", 9, tableFlags, new Vector2(0, tableHeight)))
+        {
+            return;
+        }
+
+        ImGui.TableSetupColumn("On", ImGuiTableColumnFlags.WidthFixed, 42 * ImGuiHelpers.GlobalScale);
+        ImGui.TableSetupColumn("Priority", ImGuiTableColumnFlags.WidthFixed, 80 * ImGuiHelpers.GlobalScale);
+        ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 0, 1);
+        ImGui.TableSetupColumn("Modules", ImGuiTableColumnFlags.WidthStretch, 0, 1);
+        ImGui.TableSetupColumn("Title", ImGuiTableColumnFlags.WidthStretch, 0, 2);
+        ImGui.TableSetupColumn("Position", ImGuiTableColumnFlags.WidthFixed, 95 * ImGuiHelpers.GlobalScale);
+        ImGui.TableSetupColumn("Color", ImGuiTableColumnFlags.WidthFixed, 125 * ImGuiHelpers.GlobalScale);
+        ImGui.TableSetupColumn("Glow", ImGuiTableColumnFlags.WidthFixed, 125 * ImGuiHelpers.GlobalScale);
+        ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 82 * ImGuiHelpers.GlobalScale);
+        ImGui.TableHeadersRow();
+
+        for (var i = 0; i < configuration.ModuleStatusEffects.Count; i++)
+        {
+            var effect = configuration.ModuleStatusEffects[i];
+            if (!effect.UseHonorific)
+            {
+                continue;
+            }
+
+            ImGui.PushID($"HonorificEffect{i}");
+            ImGui.TableNextRow();
+
+            ImGui.TableNextColumn();
+            DrawStatusEffectEnabledColumn(effect, i);
+
+            ImGui.TableNextColumn();
+            var priority = Math.Max(1, effect.HonorificPriority);
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.InputInt("##HonorificPriority", ref priority))
+            {
+                effect.HonorificPriority = Math.Max(1, priority);
+                configuration.ModuleStatusEffects[i] = effect;
+                saveConfiguration();
+            }
+            DrawHelpTooltip("Lower numbers win when multiple linked Honorific titles are active.");
+
+            DrawStatusEffectNameAndModulesColumns(effect, i);
+
+            ImGui.TableNextColumn();
+            var honorificTitle = effect.HonorificTitle;
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.InputText("##HonorificTitle", ref honorificTitle, 80))
+            {
+                effect.HonorificTitle = honorificTitle;
+                configuration.ModuleStatusEffects[i] = effect;
+                saveConfiguration();
+            }
+
+            ImGui.TableNextColumn();
+            DrawHonorificPositionCombo(effect, i);
+
+            ImGui.TableNextColumn();
+            DrawHonorificColorPicker("Color", effect.HonorificColor, value => effect.HonorificColor = value, effect, i);
+
+            ImGui.TableNextColumn();
+            DrawHonorificColorPicker("Glow", effect.HonorificGlow, value => effect.HonorificGlow = value, effect, i);
+
+            ImGui.TableNextColumn();
+            if (ImGui.Button("Delete", new Vector2(-1, 0)))
+            {
+                configuration.ModuleStatusEffects.RemoveAt(i);
+                saveConfiguration();
+                ImGui.PopID();
+                break;
+            }
+
+            ImGui.PopID();
+        }
+
+        ImGui.EndTable();
+        DrawVerticalResizeHandle(
+            "HonorificStatusEffectsResize",
+            ref honorificStatusEffectTableHeight,
+            minTableHeight,
+            maxTableHeight,
+            resizeHandleHeight);
+    }
+
+    private void DrawStatusEffectBaseColumns(ModuleStatusEffect effect, int index)
+    {
+        DrawStatusEffectEnabledColumn(effect, index);
+        DrawStatusEffectNameAndModulesColumns(effect, index);
+    }
+
+    private void DrawStatusEffectEnabledColumn(ModuleStatusEffect effect, int index)
+    {
+        var enabled = effect.Enabled;
+        var blockedByOtherHonorific = effect.UseHonorific && !effect.Enabled && HasEnabledHonorificStatusEffectWithSameModules(effect, index);
+        if (blockedByOtherHonorific)
+        {
+            ImGui.BeginDisabled();
+        }
+
+        if (ImGui.Checkbox("##Enabled", ref enabled))
+        {
+            effect.Enabled = enabled;
+            if (!enabled && HasStatusEffectCommand(effect) && HasAnySelectedStatusEffectModuleEnabled(effect))
+            {
+                if (effect.UseMoodle)
+                {
+                    effect.IsApplied = true;
+                }
+
+                if (effect.UseHonorific && effect.HonorificIsApplied)
+                {
+                    effect.HonorificIsApplied = true;
+                }
+            }
+
+            configuration.ModuleStatusEffects[index] = effect;
+            saveConfiguration();
+        }
+
+        if (blockedByOtherHonorific)
+        {
+            ImGui.EndDisabled();
+            DrawAdvancedModeOnlyTooltip("Another enabled Honorific entry already uses the same module selection. Change its modules or disable it first.");
+        }
+    }
+
+    private void DrawStatusEffectNameAndModulesColumns(ModuleStatusEffect effect, int index)
+    {
+        ImGui.TableNextColumn();
+        var name = effect.Name;
+        ImGui.SetNextItemWidth(-1);
+        if (ImGui.InputText("##Name", ref name, 80))
+        {
+            effect.Name = name;
+            configuration.ModuleStatusEffects[index] = effect;
+            saveConfiguration();
+        }
+
+        ImGui.TableNextColumn();
+        DrawStatusEffectModuleCombo(effect, index);
+    }
+
+    private void DrawStatusEffectModuleCombo(ModuleStatusEffect effect, int index)
+    {
+        ImGui.SetNextItemWidth(-1);
+        if (!ImGui.BeginCombo("##Modules", GetStatusEffectModuleSummary(effect)))
+        {
+            return;
+        }
+
+        DrawStatusEffectModuleComboCheckbox("ToD", effect.TriggerOnTod, value => effect.TriggerOnTod = value, effect, index);
+        DrawStatusEffectModuleComboCheckbox("ToD2", effect.TriggerOnTodSecondPair, value => effect.TriggerOnTodSecondPair = value, effect, index);
+        DrawStatusEffectModuleComboCheckbox("Special Rules", effect.TriggerOnTodSpecialRules, value => effect.TriggerOnTodSpecialRules = value, effect, index);
+        DrawStatusEffectModuleComboCheckbox("!truth", effect.TriggerOnTruth, value => effect.TriggerOnTruth = value, effect, index);
+        DrawStatusEffectModuleComboCheckbox("!dare", effect.TriggerOnDare, value => effect.TriggerOnDare = value, effect, index);
+        DrawStatusEffectModuleComboCheckbox("!help", effect.TriggerOnHelp, value => effect.TriggerOnHelp = value, effect, index);
+        DrawStatusEffectModuleComboCheckbox("Chat Alias", effect.TriggerOnChatAlias, value => effect.TriggerOnChatAlias = value, effect, index);
+        DrawStatusEffectModuleComboCheckbox("!wifi", effect.TriggerOnWifi, value => effect.TriggerOnWifi = value, effect, index);
+
+        ImGui.EndCombo();
+    }
+
+    private void DrawStatusEffectModuleComboCheckbox(string label, bool selected, Action<bool> setSelected, ModuleStatusEffect effect, int index)
+    {
+        var value = selected;
+        if (ImGui.Checkbox(label, ref value))
+        {
+            setSelected(value);
+            if (effect.UseHonorific && effect.Enabled && HasEnabledHonorificStatusEffectWithSameModules(effect, index))
+            {
+                setSelected(selected);
+                configuration.ModuleStatusEffects[index] = effect;
+                saveConfiguration();
+                return;
+            }
+
+            configuration.ModuleStatusEffects[index] = effect;
+            saveConfiguration();
+        }
+    }
+
+    private static string GetStatusEffectModuleSummary(ModuleStatusEffect effect)
+    {
+        List<string> modules = [];
+        if (effect.TriggerOnTod) modules.Add("ToD");
+        if (effect.TriggerOnTodSecondPair) modules.Add("ToD2");
+        if (effect.TriggerOnTodSpecialRules) modules.Add("Rules");
+        if (effect.TriggerOnTruth) modules.Add("Truth");
+        if (effect.TriggerOnDare) modules.Add("Dare");
+        if (effect.TriggerOnHelp) modules.Add("Help");
+        if (effect.TriggerOnChatAlias) modules.Add("Alias");
+        if (effect.TriggerOnWifi) modules.Add("Wifi");
+        return modules.Count == 0 ? "Select modules" : string.Join(", ", modules);
+    }
+
+    private void DrawStatusMacroModuleCombo(ModuleStatusMacro macro, int index)
+    {
+        ImGui.SetNextItemWidth(-1);
+        if (!ImGui.BeginCombo("##Modules", GetStatusMacroModuleSummary(macro)))
+        {
+            return;
+        }
+
+        DrawStatusMacroModuleComboCheckbox("ToD", macro.TriggerOnTod, value => macro.TriggerOnTod = value, macro, index);
+        DrawStatusMacroModuleComboCheckbox("ToD2", macro.TriggerOnTodSecondPair, value => macro.TriggerOnTodSecondPair = value, macro, index);
+        DrawStatusMacroModuleComboCheckbox("Special Rules", macro.TriggerOnTodSpecialRules, value => macro.TriggerOnTodSpecialRules = value, macro, index);
+        DrawStatusMacroModuleComboCheckbox("!truth", macro.TriggerOnTruth, value => macro.TriggerOnTruth = value, macro, index);
+        DrawStatusMacroModuleComboCheckbox("!dare", macro.TriggerOnDare, value => macro.TriggerOnDare = value, macro, index);
+        DrawStatusMacroModuleComboCheckbox("!help", macro.TriggerOnHelp, value => macro.TriggerOnHelp = value, macro, index);
+        DrawStatusMacroModuleComboCheckbox("Chat Alias", macro.TriggerOnChatAlias, value => macro.TriggerOnChatAlias = value, macro, index);
+        DrawStatusMacroModuleComboCheckbox("!wifi", macro.TriggerOnWifi, value => macro.TriggerOnWifi = value, macro, index);
+
+        ImGui.EndCombo();
+    }
+
+    private void DrawStatusMacroModuleComboCheckbox(string label, bool selected, Action<bool> setSelected, ModuleStatusMacro macro, int index)
+    {
+        var value = selected;
+        if (ImGui.Checkbox(label, ref value))
+        {
+            setSelected(value);
+            configuration.ModuleStatusMacros[index] = macro;
+            saveConfiguration();
+        }
+    }
+
+    private static string GetStatusMacroModuleSummary(ModuleStatusMacro macro)
+    {
+        List<string> modules = [];
+        if (macro.TriggerOnTod) modules.Add("ToD");
+        if (macro.TriggerOnTodSecondPair) modules.Add("ToD2");
+        if (macro.TriggerOnTodSpecialRules) modules.Add("Rules");
+        if (macro.TriggerOnTruth) modules.Add("Truth");
+        if (macro.TriggerOnDare) modules.Add("Dare");
+        if (macro.TriggerOnHelp) modules.Add("Help");
+        if (macro.TriggerOnChatAlias) modules.Add("Alias");
+        if (macro.TriggerOnWifi) modules.Add("Wifi");
+        return modules.Count == 0 ? "Select modules" : string.Join(", ", modules);
+    }
+
+    private static bool HasStatusMacroCommand(ModuleStatusMacro macro)
+    {
+        return !string.IsNullOrWhiteSpace(macro.EnableMacroText) ||
+            !string.IsNullOrWhiteSpace(macro.DisableMacroText);
+    }
+
+    private bool HasAnySelectedStatusMacroModuleEnabled(ModuleStatusMacro macro)
+    {
+        return (macro.TriggerOnTod && configuration.Enabled) ||
+            (macro.TriggerOnTodSecondPair && configuration.TodSecondPairEnabled) ||
+            (macro.TriggerOnTodSpecialRules && configuration.TodSpecialRulesEnabled) ||
+            (macro.TriggerOnTruth && configuration.TruthTriggerEnabled) ||
+            (macro.TriggerOnDare && configuration.DareTriggerEnabled) ||
+            (macro.TriggerOnHelp && configuration.HelpTriggerEnabled) ||
+            (macro.TriggerOnChatAlias && configuration.ChatAliasEnabled) ||
+            (macro.TriggerOnWifi && configuration.WifiEnabled);
+    }
+
+    private static bool HasStatusEffectCommand(ModuleStatusEffect effect)
+    {
+        return (effect.UseMoodle && !string.IsNullOrWhiteSpace(effect.MoodleName)) ||
+            (effect.UseHonorific && !string.IsNullOrWhiteSpace(effect.HonorificTitle));
+    }
+
+    private bool HasEnabledHonorificStatusEffectWithSameModules(ModuleStatusEffect source, int exceptIndex = -1)
+    {
+        for (var i = 0; i < configuration.ModuleStatusEffects.Count; i++)
+        {
+            if (i == exceptIndex)
+            {
+                continue;
+            }
+
+            var effect = configuration.ModuleStatusEffects[i];
+            if (effect.UseHonorific && effect.Enabled && HasSameStatusEffectModules(source, effect))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasSameStatusEffectModules(ModuleStatusEffect left, ModuleStatusEffect right)
+    {
+        return left.TriggerOnTod == right.TriggerOnTod &&
+            left.TriggerOnTodSecondPair == right.TriggerOnTodSecondPair &&
+            left.TriggerOnTodSpecialRules == right.TriggerOnTodSpecialRules &&
+            left.TriggerOnTruth == right.TriggerOnTruth &&
+            left.TriggerOnDare == right.TriggerOnDare &&
+            left.TriggerOnHelp == right.TriggerOnHelp &&
+            left.TriggerOnChatAlias == right.TriggerOnChatAlias &&
+            left.TriggerOnWifi == right.TriggerOnWifi;
+    }
+
+    private bool HasAnySelectedStatusEffectModuleEnabled(ModuleStatusEffect effect)
+    {
+        return (effect.TriggerOnTod && configuration.Enabled) ||
+            (effect.TriggerOnTodSecondPair && configuration.TodSecondPairEnabled) ||
+            (effect.TriggerOnTodSpecialRules && configuration.TodSpecialRulesEnabled) ||
+            (effect.TriggerOnTruth && configuration.TruthTriggerEnabled) ||
+            (effect.TriggerOnDare && configuration.DareTriggerEnabled) ||
+            (effect.TriggerOnHelp && configuration.HelpTriggerEnabled) ||
+            (effect.TriggerOnChatAlias && configuration.ChatAliasEnabled) ||
+            (effect.TriggerOnWifi && configuration.WifiEnabled);
+    }
+
+    private void DrawHonorificPositionCombo(ModuleStatusEffect effect, int index)
+    {
+        var positionIndex = GetHonorificPositionIndex(effect.HonorificPosition);
+        ImGui.SetNextItemWidth(-1);
+        if (!ImGui.BeginCombo("##HonorificPosition", HonorificPositionNames[positionIndex]))
+        {
+            return;
+        }
+
+        for (var i = 0; i < HonorificPositionNames.Length; i++)
+        {
+            if (ImGui.Selectable(HonorificPositionNames[i], positionIndex == i))
+            {
+                effect.HonorificPosition = HonorificPositionNames[i].ToLowerInvariant();
+                configuration.ModuleStatusEffects[index] = effect;
+                saveConfiguration();
+            }
+        }
+
+        ImGui.EndCombo();
+    }
+
+    private void DrawHonorificColorPicker(string label, string color, Action<string> setColor, ModuleStatusEffect effect, int index)
+    {
+        var scale = ImGuiHelpers.GlobalScale;
+        var colorValue = HexToVector3(color);
+        var colorButtonSize = new Vector2(ImGui.GetFrameHeight(), ImGui.GetFrameHeight());
+        if (ImGui.ColorButton($"##{label}", new Vector4(colorValue, 1f), ImGuiColorEditFlags.NoTooltip, colorButtonSize))
+        {
+            ImGui.OpenPopup($"{label}Picker");
+        }
+        DrawHelpTooltip($"{label} used for /honorific force set.");
+
+        if (ImGui.BeginPopup($"{label}Picker"))
+        {
+            ImGui.SetNextItemWidth(280 * scale);
+            if (ImGui.ColorPicker3($"##{label}PickerValue", ref colorValue))
+            {
+                setColor(Vector3ToHex(colorValue));
+                configuration.ModuleStatusEffects[index] = effect;
+                saveConfiguration();
+            }
+
+            var hasColor = !string.IsNullOrWhiteSpace(color);
+            var clearButtonSize = new Vector2(76 * scale, 0);
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, ImGui.GetContentRegionAvail().X - clearButtonSize.X));
+            if (!hasColor)
+            {
+                ImGui.BeginDisabled();
+            }
+
+            if (ImGui.Button($"Clear##{label}", clearButtonSize))
+            {
+                setColor(string.Empty);
+                configuration.ModuleStatusEffects[index] = effect;
+                saveConfiguration();
+            }
+
+            if (!hasColor)
+            {
+                ImGui.EndDisabled();
+            }
+
+            DrawHelpTooltip($"Clear the {label.ToLowerInvariant()} value so it is not sent to Honorific.");
+            ImGui.EndPopup();
+        }
+    }
+
+    private static int GetHonorificPositionIndex(string position)
+    {
+        return position.Trim().ToLowerInvariant() switch
+        {
+            "prefix" => 1,
+            "suffix" => 2,
+            _ => 0,
+        };
+    }
+
+    private static Vector3 HexToVector3(string hex)
+    {
+        var normalized = hex.Trim().TrimStart('#');
+        if (normalized.Length != 6 ||
+            !int.TryParse(normalized[..2], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var red) ||
+            !int.TryParse(normalized.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var green) ||
+            !int.TryParse(normalized.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var blue))
+        {
+            return Vector3.One;
+        }
+
+        return new Vector3(red / 255f, green / 255f, blue / 255f);
+    }
+
+    private static string Vector3ToHex(Vector3 color)
+    {
+        var red = (int)Math.Clamp(MathF.Round(color.X * 255f), 0, 255);
+        var green = (int)Math.Clamp(MathF.Round(color.Y * 255f), 0, 255);
+        var blue = (int)Math.Clamp(MathF.Round(color.Z * 255f), 0, 255);
+        return $"#{red:X2}{green:X2}{blue:X2}";
     }
 
     private void DrawCommandHelpTab()
@@ -2244,14 +2975,25 @@ internal sealed class MainWindow : Window, IDisposable
             ImGui.EndDisabled();
         }
 
-        DrawHelpTooltip(canSaveAddress
-            ? "Saves the current housing interior address for future Auto On matching."
-            : "Enter a housing interior to save an address.");
+        if (canSaveAddress)
+        {
+            DrawHelpTooltip("Saves the current housing interior address for future Auto On matching.");
+        }
+        else
+        {
+            DrawAdvancedModeOnlyTooltip("Enter a housing interior first to add an address.");
+        }
 
         ImGui.TextDisabled($"Current: {(canSaveAddress ? housingInfo.AddressPreview : "Enter a housing interior to save an address.")}");
 
-        var tableHeight = Math.Min(180 * ImGuiHelpers.GlobalScale, Math.Max(90 * ImGuiHelpers.GlobalScale, ImGui.GetContentRegionAvail().Y * 0.35f));
-        if (!ImGui.BeginTable("RollTrackerAutoOnAddressBook", 4, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp, new Vector2(0, tableHeight)))
+        var scale = ImGuiHelpers.GlobalScale;
+        var resizeHandleHeight = 7 * scale;
+        var availableHeight = ImGui.GetContentRegionAvail().Y;
+        var minTableHeight = 90 * scale;
+        var maxTableHeight = Math.Max(minTableHeight, availableHeight - resizeHandleHeight - ImGui.GetStyle().ItemSpacing.Y);
+        autoOnAddressBookTableHeight = Math.Clamp(autoOnAddressBookTableHeight, minTableHeight, maxTableHeight);
+        var tableHeight = autoOnAddressBookTableHeight;
+        if (!ImGui.BeginTable("RollTrackerAutoOnAddressBook", 4, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp, new Vector2(0, tableHeight)))
         {
             return;
         }
@@ -2303,6 +3045,33 @@ internal sealed class MainWindow : Window, IDisposable
         }
 
         ImGui.EndTable();
+        DrawVerticalResizeHandle(
+            "AutoOnAddressBookResize",
+            ref autoOnAddressBookTableHeight,
+            minTableHeight,
+            maxTableHeight,
+            resizeHandleHeight);
+    }
+
+    private static void DrawVerticalResizeHandle(string id, ref float height, float minHeight, float maxHeight, float handleHeight)
+    {
+        var width = ImGui.GetContentRegionAvail().X;
+        var screenPos = ImGui.GetCursorScreenPos();
+        ImGui.InvisibleButton($"##{id}", new Vector2(width, handleHeight));
+
+        if (ImGui.IsItemActive())
+        {
+            height = Math.Clamp(height + ImGui.GetIO().MouseDelta.Y, minHeight, maxHeight);
+        }
+
+        var color = ImGui.IsItemActive()
+            ? ImGui.GetColorU32(ImGuiCol.ButtonActive)
+            : ImGui.IsItemHovered()
+                ? ImGui.GetColorU32(ImGuiCol.ButtonHovered)
+                : ImGui.GetColorU32(ImGuiCol.Border);
+        var y = screenPos.Y + handleHeight * 0.5f;
+        ImGui.GetWindowDrawList().AddLine(new Vector2(screenPos.X, y), new Vector2(screenPos.X + width, y), color, Math.Max(1f, ImGuiHelpers.GlobalScale));
+        DrawHelpTooltip("Drag to resize the address list.");
     }
 
     private void DrawCurrentHousingInfo(RollTrackerService.HousingDebugInfo housingInfo)
@@ -2488,6 +3257,18 @@ internal sealed class MainWindow : Window, IDisposable
         DrawHelpTooltip("Allows configured aliases that run /rt on, /rt toggle, /rt alias on, or /rt alias toggle to work even when Chat Alias is currently disabled.");
     }
 
+    private void DrawSuggestionsLinkToggle()
+    {
+        var linkSuggestionsToTodModules = configuration.LinkSuggestionsToTodModules;
+        if (ImGui.Checkbox("Link !truth and !dare to ToD / ToD2", ref linkSuggestionsToTodModules))
+        {
+            configuration.LinkSuggestionsToTodModules = linkSuggestionsToTodModules;
+            saveConfiguration();
+        }
+
+        DrawHelpTooltip("When enabled, turning !tod or !tod2 on also enables !truth and !dare. They turn off again when both ToD modules are off.");
+    }
+
     private void DrawAutoOffMasterCheckbox(string label)
     {
         var autoDisableWhenLeavingHousing = configuration.AutoDisableWhenLeavingHousing;
@@ -2655,16 +3436,24 @@ internal sealed class MainWindow : Window, IDisposable
         DrawHelpTooltip("Alias rows with Feedback enabled send their status message to this chat channel.");
 
         ImGui.SameLine();
-        if (ImGui.Button($"All feedback on##{id}ChatAliasFeedbackAllOn", new Vector2(130 * ImGuiHelpers.GlobalScale, 0)))
+        var allFeedbackEnabled = configuration.ChatAliasCommands.Count > 0 &&
+            configuration.ChatAliasCommands.All(aliasCommand => aliasCommand.FeedbackEnabled);
+        var feedbackToggleLabel = allFeedbackEnabled ? "All feedback: On" : "All feedback: Off";
+        if (configuration.ChatAliasCommands.Count == 0)
         {
-            SetAllChatAliasFeedback(true);
+            ImGui.BeginDisabled();
         }
 
-        ImGui.SameLine();
-        if (ImGui.Button($"All feedback off##{id}ChatAliasFeedbackAllOff", new Vector2(130 * ImGuiHelpers.GlobalScale, 0)))
+        if (ImGui.Button($"{feedbackToggleLabel}##{id}ChatAliasFeedbackToggleAll", new Vector2(150 * ImGuiHelpers.GlobalScale, 0)))
         {
-            SetAllChatAliasFeedback(false);
+            SetAllChatAliasFeedback(!allFeedbackEnabled);
         }
+
+        if (configuration.ChatAliasCommands.Count == 0)
+        {
+            ImGui.EndDisabled();
+        }
+        DrawHelpTooltip(allFeedbackEnabled ? "Turn feedback off for every alias row." : "Turn feedback on for every alias row.");
 
         ImGui.Spacing();
         DrawChatAliasAddRow(id);
@@ -3276,17 +4065,13 @@ internal sealed class MainWindow : Window, IDisposable
         DrawModuleToggle("Enable ToD", configuration.Enabled, rollTrackerService.SetEnabled);
         DrawModuleToggle("Enable ToD - Doubles", configuration.TodSecondPairEnabled, rollTrackerService.SetSecondPairEnabled);
 
-        var todSpecialRulesEnabled = configuration.TodSpecialRulesEnabled;
-        if (ImGui.Checkbox("Enable ToD special rules", ref todSpecialRulesEnabled))
-        {
-            configuration.TodSpecialRulesEnabled = todSpecialRulesEnabled;
-            saveConfiguration();
-        }
+        DrawModuleToggle("Enable ToD special rules", configuration.TodSpecialRulesEnabled, rollTrackerService.SetTodSpecialRulesEnabled);
 
         ImGui.Spacing();
         DrawSectionTitle("Suggestions");
         DrawModuleToggle("Enable !truth", configuration.TruthTriggerEnabled, rollTrackerService.SetTruthTriggerEnabled);
         DrawModuleToggle("Enable !dare", configuration.DareTriggerEnabled, rollTrackerService.SetDareTriggerEnabled);
+        DrawSuggestionsLinkToggle();
 
         ImGui.Spacing();
         DrawSectionTitle("Command Help");
@@ -3877,6 +4662,7 @@ internal sealed class MainWindow : Window, IDisposable
         CommandHelp,
         ChatAlias,
         Wifi,
+        StatusEffects,
         AutoOff,
         Settings,
     }

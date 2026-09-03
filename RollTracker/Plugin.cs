@@ -271,9 +271,7 @@ public sealed class Plugin : IDalamudPlugin
             target.Equals("tod rules", StringComparison.OrdinalIgnoreCase) ||
             target.Equals("special", StringComparison.OrdinalIgnoreCase))
         {
-            Configuration.TodSpecialRulesEnabled = enabled;
-            SaveConfiguration();
-            ChatGui.Print($"RollTracker ToD special rules {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+            RollTrackerService.SetTodSpecialRulesEnabled(enabled);
             return true;
         }
 
@@ -371,9 +369,7 @@ public sealed class Plugin : IDalamudPlugin
             target.Equals("tod rules", StringComparison.OrdinalIgnoreCase) ||
             target.Equals("special", StringComparison.OrdinalIgnoreCase))
         {
-            Configuration.TodSpecialRulesEnabled = !Configuration.TodSpecialRulesEnabled;
-            SaveConfiguration();
-            ChatGui.Print($"RollTracker ToD special rules {(Configuration.TodSpecialRulesEnabled ? "enabled" : "disabled")}.", "RollTracker");
+            RollTrackerService.SetTodSpecialRulesEnabled(!Configuration.TodSpecialRulesEnabled);
             return true;
         }
 

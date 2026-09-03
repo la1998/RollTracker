@@ -17,6 +17,7 @@ internal sealed partial class RollTrackerService : IDisposable
 {
     private const string DefaultResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll})";
     private const int ChatAliasFeedbackDelayMilliseconds = 1500;
+    private const int AutoStatusEffectDelayMilliseconds = 2500;
     private const string LegacySecondPairMacroText = "/y ♦ Time for Truth or Dare 2 ♦  Highest asks lowest, second highest asks second lowest. Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
     private const string DefaultSecondPairMacroText = "/y ♦ Time for Truth or Dare 2 ♦  Highest asks lowest, second highest asks second lowest,  \"Truth or Dare?\" Type /random in chat! 60 seconds... And GO!\n/wait 50\n/y 10 seconds remain...\n/wait 10\n/y End";
     private const string LegacySecondPairResultCommandTemplate = "/y \"{highest}\"({highestRoll})>>>\"{lowest}\"({lowestRoll}) 2nd: \"{secondHighest}\"({secondHighestRoll})>>>\"{secondLowest}\"({secondLowestRoll})";
@@ -36,6 +37,7 @@ internal sealed partial class RollTrackerService : IDisposable
     private readonly Queue<MacroStep> pendingMacroSteps = [];
     private readonly Queue<MacroStep> pendingWifiMacroSteps = [];
     private readonly Queue<DelayedCommand> pendingTodPromptCommands = [];
+    private readonly Queue<DelayedCommand> pendingStatusEffectCommands = [];
     private readonly HashSet<uint> housingInteriorTerritoryIds;
     private readonly HashSet<uint> residentialTerritoryIds;
     private readonly List<string> worldNames;
@@ -53,6 +55,8 @@ internal sealed partial class RollTrackerService : IDisposable
     private bool lastAutoOffTransitionWasHousingInteriorMove;
     private DateTimeOffset? pendingAutoOnCheckUntil;
     private bool pendingAutoOnEnteringAutoOff;
+    private bool pendingAutoOnTerritoryChangeAutoOff;
+    private string? lastHousingAddressKey;
     private uint lastTerritoryType;
 
     public RollTrackerService(
@@ -763,12 +767,9 @@ internal sealed partial class RollTrackerService : IDisposable
 
     public void SetEnabled(bool enabled)
     {
+        var changed = configuration.Enabled != enabled;
         configuration.Enabled = enabled;
-        if (enabled)
-        {
-            configuration.TruthTriggerEnabled = true;
-            configuration.DareTriggerEnabled = true;
-        }
+        ApplySuggestionLinkForTodModules(enabled || configuration.TodSecondPairEnabled);
 
         saveConfiguration();
 
@@ -779,11 +780,17 @@ internal sealed partial class RollTrackerService : IDisposable
             pendingTodPromptCommands.Clear();
         }
 
-        chatGui.Print($"RollTracker {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+        if (changed)
+        {
+            TriggerModuleStatusEffects(StatusEffectModule.Tod, enabled);
+        }
+
+        chatGui.Print($"RollTracker !tod {(enabled ? "enabled" : "disabled")}.", "RollTracker");
     }
 
     public void SetAllModulesEnabled(bool enabled)
     {
+        var changedModules = GetChangedStatusEffectModulesForAllToggle(enabled);
         configuration.Enabled = enabled;
         configuration.TruthTriggerEnabled = enabled;
         configuration.DareTriggerEnabled = enabled;
@@ -802,11 +809,13 @@ internal sealed partial class RollTrackerService : IDisposable
             pendingTodPromptCommands.Clear();
         }
 
+        TriggerModuleStatusEffects(changedModules, enabled);
         chatGui.Print($"RollTracker modules {(enabled ? "enabled" : "disabled")}.", "RollTracker");
     }
 
     public void SetTruthTriggerEnabled(bool enabled)
     {
+        var changed = configuration.TruthTriggerEnabled != enabled;
         configuration.TruthTriggerEnabled = enabled;
         saveConfiguration();
 
@@ -815,11 +824,17 @@ internal sealed partial class RollTrackerService : IDisposable
             ClearDelayedTodPrompts("Truth");
         }
 
+        if (changed)
+        {
+            TriggerModuleStatusEffects(StatusEffectModule.Truth, enabled);
+        }
+
         chatGui.Print($"RollTracker !truth {(enabled ? "enabled" : "disabled")}.", "RollTracker");
     }
 
     public void SetDareTriggerEnabled(bool enabled)
     {
+        var changed = configuration.DareTriggerEnabled != enabled;
         configuration.DareTriggerEnabled = enabled;
         saveConfiguration();
 
@@ -828,11 +843,17 @@ internal sealed partial class RollTrackerService : IDisposable
             ClearDelayedTodPrompts("Dare");
         }
 
+        if (changed)
+        {
+            TriggerModuleStatusEffects(StatusEffectModule.Dare, enabled);
+        }
+
         chatGui.Print($"RollTracker !dare {(enabled ? "enabled" : "disabled")}.", "RollTracker");
     }
 
     public void SetHelpTriggerEnabled(bool enabled)
     {
+        var changed = configuration.HelpTriggerEnabled != enabled;
         configuration.HelpTriggerEnabled = enabled;
         saveConfiguration();
 
@@ -841,19 +862,32 @@ internal sealed partial class RollTrackerService : IDisposable
             ClearDelayedTodPrompts("Help");
         }
 
+        if (changed)
+        {
+            TriggerModuleStatusEffects(StatusEffectModule.Help, enabled);
+        }
+
         chatGui.Print($"RollTracker !help {(enabled ? "enabled" : "disabled")}.", "RollTracker");
     }
 
     public void SetChatAliasEnabled(bool enabled)
     {
+        var changed = configuration.ChatAliasEnabled != enabled;
         configuration.ChatAliasEnabled = enabled;
         saveConfiguration();
+        if (changed)
+        {
+            TriggerModuleStatusEffects(StatusEffectModule.ChatAlias, enabled);
+        }
+
         chatGui.Print($"RollTracker chat alias {(enabled ? "enabled" : "disabled")}.", "RollTracker");
     }
 
     public void SetSecondPairEnabled(bool enabled)
     {
+        var changed = configuration.TodSecondPairEnabled != enabled;
         configuration.TodSecondPairEnabled = enabled;
+        ApplySuggestionLinkForTodModules(enabled || configuration.Enabled);
         saveConfiguration();
 
         if (!enabled && IsSecondPairRoundRunning)
@@ -864,17 +898,72 @@ internal sealed partial class RollTrackerService : IDisposable
             currentRoundKind = RoundKind.Normal;
         }
 
+        if (changed)
+        {
+            TriggerModuleStatusEffects(StatusEffectModule.TodSecondPair, enabled);
+        }
+
         chatGui.Print($"RollTracker !tod2 second pair rounds {(enabled ? "enabled" : "disabled")}.", "RollTracker");
+    }
+
+    private void ApplySuggestionLinkForTodModules(bool enabled)
+    {
+        if (!configuration.LinkSuggestionsToTodModules)
+        {
+            return;
+        }
+
+        var truthChanged = configuration.TruthTriggerEnabled != enabled;
+        var dareChanged = configuration.DareTriggerEnabled != enabled;
+
+        configuration.TruthTriggerEnabled = enabled;
+        configuration.DareTriggerEnabled = enabled;
+
+        if (!enabled)
+        {
+            ClearDelayedTodPrompts("Truth");
+            ClearDelayedTodPrompts("Dare");
+        }
+
+        if (truthChanged)
+        {
+            TriggerModuleStatusEffects(StatusEffectModule.Truth, enabled);
+        }
+
+        if (dareChanged)
+        {
+            TriggerModuleStatusEffects(StatusEffectModule.Dare, enabled);
+        }
+    }
+
+    public void SetTodSpecialRulesEnabled(bool enabled)
+    {
+        var changed = configuration.TodSpecialRulesEnabled != enabled;
+        configuration.TodSpecialRulesEnabled = enabled;
+        saveConfiguration();
+
+        if (changed)
+        {
+            TriggerModuleStatusEffects(StatusEffectModule.TodSpecialRules, enabled);
+        }
+
+        chatGui.Print($"RollTracker ToD special rules {(enabled ? "enabled" : "disabled")}.", "RollTracker");
     }
 
     public void SetWifiEnabled(bool enabled)
     {
+        var changed = configuration.WifiEnabled != enabled;
         configuration.WifiEnabled = enabled;
         saveConfiguration();
 
         if (!enabled)
         {
             pendingWifiMacroSteps.Clear();
+        }
+
+        if (changed)
+        {
+            TriggerModuleStatusEffects(StatusEffectModule.Wifi, enabled);
         }
 
         chatGui.Print($"RollTracker !wifi {(enabled ? "enabled" : "disabled")}.", "RollTracker");
@@ -1108,6 +1197,7 @@ internal sealed partial class RollTrackerService : IDisposable
         var now = DateTimeOffset.Now;
         TrackAutoOffLocationState();
         ProcessPendingAutoOn(now);
+        TrackAutoOnAddressState();
 
         if (roundEndsAt is not null && pendingMacroSteps.Count > 0 && now >= nextMacroStepAt)
         {
@@ -1122,6 +1212,11 @@ internal sealed partial class RollTrackerService : IDisposable
         if (pendingTodPromptCommands.Count > 0 && now >= pendingTodPromptCommands.Peek().ExecuteAt)
         {
             ExecuteNextTodPromptCommand();
+        }
+
+        if (pendingStatusEffectCommands.Count > 0 && now >= pendingStatusEffectCommands.Peek().ExecuteAt)
+        {
+            ExecuteNextStatusEffectCommand(now);
         }
 
         if (roundEndsAt is not null && now >= roundEndsAt.Value)
@@ -1164,18 +1259,29 @@ internal sealed partial class RollTrackerService : IDisposable
         var territoryChanged = (lastTerritoryType != 0 && lastTerritoryType != territoryType) || forceZoneChange;
         var leftHousingInterior = wasInHousingInterior && !isInHousingInterior;
         var enteredHousingInterior = !wasInHousingInterior && isInHousingInterior;
-        var matchedAutoOnAddress = enteredHousingInterior ? TryEnableAutoOnForCurrentAddress() : null;
+        var changedHousingInterior = wasInHousingInterior && isInHousingInterior && territoryChanged;
+        var housingInteriorMove = leftHousingInterior || enteredHousingInterior || changedHousingInterior;
+        var shouldCheckAutoOnForCurrentInterior = enteredHousingInterior || changedHousingInterior;
+        var currentAutoOnAddressReliable = false;
+        var matchedAutoOnAddress = shouldCheckAutoOnForCurrentInterior
+            ? TryEnableAutoOnForCurrentAddress(out currentAutoOnAddressReliable)
+            : null;
         var waitingForAutoOnAddress = false;
 
         if (leftHousingInterior)
         {
             ClearPendingAutoOn();
+            lastHousingAddressKey = null;
         }
 
-        if (enteredHousingInterior && matchedAutoOnAddress is null && ShouldCheckAutoOnAddresses())
+        if (shouldCheckAutoOnForCurrentInterior &&
+            matchedAutoOnAddress is null &&
+            !currentAutoOnAddressReliable &&
+            ShouldCheckAutoOnAddresses())
         {
             pendingAutoOnCheckUntil = DateTimeOffset.Now.AddSeconds(5);
-            pendingAutoOnEnteringAutoOff = configuration.AutoDisableOnEnteringHousingInterior;
+            pendingAutoOnEnteringAutoOff = enteredHousingInterior && configuration.AutoDisableOnEnteringHousingInterior;
+            pendingAutoOnTerritoryChangeAutoOff = changedHousingInterior && configuration.AutoDisableOnTerritoryChange;
             waitingForAutoOnAddress = true;
         }
 
@@ -1184,6 +1290,8 @@ internal sealed partial class RollTrackerService : IDisposable
             forceZoneChange,
             leftHousingInterior,
             enteredHousingInterior,
+            changedHousingInterior,
+            housingInteriorMove,
             matchedAutoOnAddress is not null || waitingForAutoOnAddress,
             isInResidentialArea);
 
@@ -1193,7 +1301,7 @@ internal sealed partial class RollTrackerService : IDisposable
         }
 
         lastTerritoryType = territoryType;
-        lastAutoOffTransitionWasHousingInteriorMove = leftHousingInterior || enteredHousingInterior;
+        lastAutoOffTransitionWasHousingInteriorMove = housingInteriorMove;
         wasInHousingInterior = isInHousingInterior;
         wasInResidentialArea = isInResidentialArea;
     }
@@ -1208,6 +1316,7 @@ internal sealed partial class RollTrackerService : IDisposable
         if (!IsHousingInterior(clientState.TerritoryType))
         {
             ClearPendingAutoOn();
+            lastHousingAddressKey = null;
             return;
         }
 
@@ -1227,6 +1336,11 @@ internal sealed partial class RollTrackerService : IDisposable
             configuration.AutoDisableWhenLeavingHousing &&
             configuration.AutoDisableOnEnteringHousingInterior &&
             HasEnabledModules();
+        var shouldRunDeferredTerritoryChangeAutoOff =
+            pendingAutoOnTerritoryChangeAutoOff &&
+            configuration.AutoDisableWhenLeavingHousing &&
+            configuration.AutoDisableOnTerritoryChange &&
+            HasEnabledModules();
 
         ClearPendingAutoOn();
 
@@ -1234,12 +1348,49 @@ internal sealed partial class RollTrackerService : IDisposable
         {
             DisableModulesForAutoOff("you entered the house");
         }
+        else if (shouldRunDeferredTerritoryChangeAutoOff)
+        {
+            DisableModulesForAutoOff("you changed territory");
+        }
     }
 
     private void ClearPendingAutoOn()
     {
         pendingAutoOnCheckUntil = null;
         pendingAutoOnEnteringAutoOff = false;
+        pendingAutoOnTerritoryChangeAutoOff = false;
+    }
+
+    private void TrackAutoOnAddressState()
+    {
+        if (!IsHousingInterior(clientState.TerritoryType))
+        {
+            lastHousingAddressKey = null;
+            return;
+        }
+
+        if (!TryCreateCurrentHousingAddressEntry(string.Empty, out var currentAddress, out _))
+        {
+            return;
+        }
+
+        var currentAddressKey = GetHousingAddressKey(currentAddress);
+        if (string.Equals(lastHousingAddressKey, currentAddressKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        lastHousingAddressKey = currentAddressKey;
+        if (!ShouldCheckAutoOnAddresses())
+        {
+            return;
+        }
+
+        var matchedAddress = GetAutoOnAddressMatch(currentAddress);
+        if (matchedAddress is not null)
+        {
+            EnableModulesForAutoOn(matchedAddress);
+        }
     }
 
     private bool IsBetweenAreas()
@@ -1262,7 +1413,9 @@ internal sealed partial class RollTrackerService : IDisposable
         bool forceZoneChange,
         bool leftHousingInterior,
         bool enteredHousingInterior,
-        bool enteredSavedAutoOnAddress,
+        bool changedHousingInterior,
+        bool housingInteriorMove,
+        bool suppressAutoOffForAutoOnAddress,
         bool isInResidentialArea)
     {
         if (!configuration.AutoDisableWhenLeavingHousing)
@@ -1275,7 +1428,7 @@ internal sealed partial class RollTrackerService : IDisposable
             return "you left the house";
         }
 
-        if (configuration.AutoDisableOnEnteringHousingInterior && enteredHousingInterior && !enteredSavedAutoOnAddress)
+        if (configuration.AutoDisableOnEnteringHousingInterior && enteredHousingInterior && !suppressAutoOffForAutoOnAddress)
         {
             return "you entered the house";
         }
@@ -1285,11 +1438,15 @@ internal sealed partial class RollTrackerService : IDisposable
             return "you left the residential area";
         }
 
+        var isGeneralTerritoryChange = territoryChanged &&
+            !housingInteriorMove &&
+            !(forceZoneChange && lastAutoOffTransitionWasHousingInteriorMove);
+        var isUnsuppressedInteriorTerritoryChange = territoryChanged &&
+            changedHousingInterior &&
+            !suppressAutoOffForAutoOnAddress;
+
         if (configuration.AutoDisableOnTerritoryChange &&
-            territoryChanged &&
-            !leftHousingInterior &&
-            !enteredHousingInterior &&
-            !(forceZoneChange && lastAutoOffTransitionWasHousingInteriorMove))
+            (isGeneralTerritoryChange || isUnsuppressedInteriorTerritoryChange))
         {
             return "you changed territory";
         }
@@ -1311,19 +1468,49 @@ internal sealed partial class RollTrackerService : IDisposable
             return null;
         }
 
+        return GetAutoOnAddressMatch(currentAddress);
+    }
+
+    private HousingAddressEntry? GetAutoOnAddressMatch(HousingAddressEntry currentAddress)
+    {
         return configuration.AutoOnHousingAddresses.FirstOrDefault(address =>
             address.Enabled &&
             IsSameHousingAddress(address, currentAddress));
     }
 
+    private static string GetHousingAddressKey(HousingAddressEntry address)
+    {
+        return string.Join(
+            ':',
+            address.WorldId,
+            address.OriginalHouseTerritoryTypeId,
+            address.WardIndex,
+            address.PlotIndex,
+            address.RoomNumber,
+            address.IsApartment);
+    }
+
     private HousingAddressEntry? TryEnableAutoOnForCurrentAddress()
+    {
+        return TryEnableAutoOnForCurrentAddress(out _);
+    }
+
+    private HousingAddressEntry? TryEnableAutoOnForCurrentAddress(out bool currentAddressReliable)
     {
         if (!ShouldCheckAutoOnAddresses())
         {
+            currentAddressReliable = false;
             return null;
         }
 
-        var matchedAddress = GetCurrentAutoOnAddressMatch();
+        if (!TryCreateCurrentHousingAddressEntry(string.Empty, out var currentAddress, out _))
+        {
+            currentAddressReliable = false;
+            return null;
+        }
+
+        currentAddressReliable = true;
+        var matchedAddress = GetAutoOnAddressMatch(currentAddress);
         if (matchedAddress is not null)
         {
             EnableModulesForAutoOn(matchedAddress);
@@ -1349,6 +1536,7 @@ internal sealed partial class RollTrackerService : IDisposable
         if (configuration.AutoDisableAffectsTod)
         {
             configuration.Enabled = false;
+            TriggerModuleStatusEffects(StatusEffectModule.Tod, false, delayUntilStable: true);
             roundEndsAt = null;
             pendingMacroSteps.Clear();
         }
@@ -1356,40 +1544,47 @@ internal sealed partial class RollTrackerService : IDisposable
         if (configuration.AutoDisableAffectsTodSecondPair)
         {
             configuration.TodSecondPairEnabled = false;
+            TriggerModuleStatusEffects(StatusEffectModule.TodSecondPair, false, delayUntilStable: true);
         }
 
         if (configuration.AutoDisableAffectsTodSpecialRules)
         {
             configuration.TodSpecialRulesEnabled = false;
+            TriggerModuleStatusEffects(StatusEffectModule.TodSpecialRules, false, delayUntilStable: true);
         }
 
         if (configuration.AutoDisableAffectsTruth)
         {
             configuration.TruthTriggerEnabled = false;
             ClearDelayedTodPrompts("Truth");
+            TriggerModuleStatusEffects(StatusEffectModule.Truth, false, delayUntilStable: true);
         }
 
         if (configuration.AutoDisableAffectsDare)
         {
             configuration.DareTriggerEnabled = false;
             ClearDelayedTodPrompts("Dare");
+            TriggerModuleStatusEffects(StatusEffectModule.Dare, false, delayUntilStable: true);
         }
 
         if (configuration.AutoDisableAffectsHelp)
         {
             configuration.HelpTriggerEnabled = false;
             ClearDelayedTodPrompts("Help");
+            TriggerModuleStatusEffects(StatusEffectModule.Help, false, delayUntilStable: true);
         }
 
         if (configuration.AutoDisableAffectsChatAlias)
         {
             configuration.ChatAliasEnabled = false;
+            TriggerModuleStatusEffects(StatusEffectModule.ChatAlias, false, delayUntilStable: true);
         }
 
         if (configuration.AutoDisableAffectsWifi)
         {
             configuration.WifiEnabled = false;
             pendingWifiMacroSteps.Clear();
+            TriggerModuleStatusEffects(StatusEffectModule.Wifi, false, delayUntilStable: true);
         }
 
         saveConfiguration();
@@ -1403,48 +1598,56 @@ internal sealed partial class RollTrackerService : IDisposable
         if (configuration.AutoEnableAffectsTod && !configuration.Enabled)
         {
             configuration.Enabled = true;
+            TriggerModuleStatusEffects(StatusEffectModule.Tod, true, delayUntilStable: true);
             changed = true;
         }
 
         if (configuration.AutoEnableAffectsTodSecondPair && !configuration.TodSecondPairEnabled)
         {
             configuration.TodSecondPairEnabled = true;
+            TriggerModuleStatusEffects(StatusEffectModule.TodSecondPair, true, delayUntilStable: true);
             changed = true;
         }
 
         if (configuration.AutoEnableAffectsTodSpecialRules && !configuration.TodSpecialRulesEnabled)
         {
             configuration.TodSpecialRulesEnabled = true;
+            TriggerModuleStatusEffects(StatusEffectModule.TodSpecialRules, true, delayUntilStable: true);
             changed = true;
         }
 
         if (configuration.AutoEnableAffectsTruth && !configuration.TruthTriggerEnabled)
         {
             configuration.TruthTriggerEnabled = true;
+            TriggerModuleStatusEffects(StatusEffectModule.Truth, true, delayUntilStable: true);
             changed = true;
         }
 
         if (configuration.AutoEnableAffectsDare && !configuration.DareTriggerEnabled)
         {
             configuration.DareTriggerEnabled = true;
+            TriggerModuleStatusEffects(StatusEffectModule.Dare, true, delayUntilStable: true);
             changed = true;
         }
 
         if (configuration.AutoEnableAffectsHelp && !configuration.HelpTriggerEnabled)
         {
             configuration.HelpTriggerEnabled = true;
+            TriggerModuleStatusEffects(StatusEffectModule.Help, true, delayUntilStable: true);
             changed = true;
         }
 
         if (configuration.AutoEnableAffectsChatAlias && !configuration.ChatAliasEnabled)
         {
             configuration.ChatAliasEnabled = true;
+            TriggerModuleStatusEffects(StatusEffectModule.ChatAlias, true, delayUntilStable: true);
             changed = true;
         }
 
         if (configuration.AutoEnableAffectsWifi && !configuration.WifiEnabled)
         {
             configuration.WifiEnabled = true;
+            TriggerModuleStatusEffects(StatusEffectModule.Wifi, true, delayUntilStable: true);
             changed = true;
         }
 
@@ -1455,6 +1658,446 @@ internal sealed partial class RollTrackerService : IDisposable
 
         saveConfiguration();
         chatGui.Print($"RollTracker enabled for saved address: {address.Name}.", "RollTracker");
+    }
+
+    private List<StatusEffectModule> GetChangedStatusEffectModulesForAllToggle(bool enabled)
+    {
+        List<StatusEffectModule> modules = [];
+        if (configuration.Enabled != enabled)
+        {
+            modules.Add(StatusEffectModule.Tod);
+        }
+
+        if (configuration.TodSecondPairEnabled != enabled)
+        {
+            modules.Add(StatusEffectModule.TodSecondPair);
+        }
+
+        if (configuration.TodSpecialRulesEnabled != enabled)
+        {
+            modules.Add(StatusEffectModule.TodSpecialRules);
+        }
+
+        if (configuration.TruthTriggerEnabled != enabled)
+        {
+            modules.Add(StatusEffectModule.Truth);
+        }
+
+        if (configuration.DareTriggerEnabled != enabled)
+        {
+            modules.Add(StatusEffectModule.Dare);
+        }
+
+        if (configuration.HelpTriggerEnabled != enabled)
+        {
+            modules.Add(StatusEffectModule.Help);
+        }
+
+        if (configuration.ChatAliasEnabled != enabled)
+        {
+            modules.Add(StatusEffectModule.ChatAlias);
+        }
+
+        if (configuration.WifiEnabled != enabled)
+        {
+            modules.Add(StatusEffectModule.Wifi);
+        }
+
+        return modules;
+    }
+
+    private void TriggerModuleStatusEffects(IEnumerable<StatusEffectModule> modules, bool enabled, bool delayUntilStable = false)
+    {
+        configuration.ModuleStatusEffects ??= [];
+        configuration.ModuleStatusMacros ??= [];
+        var moduleList = modules.ToList();
+        foreach (var effect in configuration.ModuleStatusEffects.Where(effect =>
+            ShouldHandleStatusEffect(effect, enabled) &&
+            moduleList.Any(module => IsStatusEffectTriggeredByModule(effect, module))))
+        {
+            TriggerStatusEffect(effect, enabled, moduleList, delayUntilStable);
+        }
+
+        if (configuration.ModuleStatusEffects.Any(effect =>
+            effect.UseHonorific &&
+            moduleList.Any(module => IsStatusEffectTriggeredByModule(effect, module))))
+        {
+            SyncHonorificStatusEffects(delayUntilStable);
+        }
+
+        foreach (var macro in configuration.ModuleStatusMacros.Where(macro =>
+            ShouldHandleStatusMacro(macro, enabled) &&
+            moduleList.Any(module => IsStatusMacroTriggeredByModule(macro, module))))
+        {
+            TriggerStatusMacro(macro, enabled, moduleList, delayUntilStable);
+        }
+    }
+
+    private void TriggerModuleStatusEffects(StatusEffectModule module, bool enabled, bool delayUntilStable = false)
+    {
+        configuration.ModuleStatusEffects ??= [];
+        configuration.ModuleStatusMacros ??= [];
+        foreach (var effect in configuration.ModuleStatusEffects.Where(effect => ShouldHandleStatusEffect(effect, enabled) && IsStatusEffectTriggeredByModule(effect, module)))
+        {
+            TriggerStatusEffect(effect, enabled, [module], delayUntilStable);
+        }
+
+        if (configuration.ModuleStatusEffects.Any(effect => effect.UseHonorific && IsStatusEffectTriggeredByModule(effect, module)))
+        {
+            SyncHonorificStatusEffects(delayUntilStable);
+        }
+
+        foreach (var macro in configuration.ModuleStatusMacros.Where(macro => ShouldHandleStatusMacro(macro, enabled) && IsStatusMacroTriggeredByModule(macro, module)))
+        {
+            TriggerStatusMacro(macro, enabled, [module], delayUntilStable);
+        }
+    }
+
+    private void TriggerStatusEffect(ModuleStatusEffect effect, bool enabled, IReadOnlyCollection<StatusEffectModule> triggeringModules, bool delayUntilStable)
+    {
+        if (!effect.UseMoodle || string.IsNullOrWhiteSpace(effect.MoodleName))
+        {
+            return;
+        }
+
+        if (enabled && effect.IsApplied)
+        {
+            return;
+        }
+
+        if (!enabled && !effect.IsApplied)
+        {
+            return;
+        }
+
+        if (enabled && HasAnySelectedStatusEffectModuleEnabledOutside(effect, triggeringModules))
+        {
+            return;
+        }
+
+        if (!enabled && HasAnySelectedStatusEffectModuleEnabled(effect))
+        {
+            return;
+        }
+
+        var action = enabled ? "apply" : "remove";
+        ExecuteStatusEffectCommand($"/moodle {action} self moodle {QuoteCommandArgument(effect.MoodleName)}", delayUntilStable);
+
+        effect.IsApplied = enabled;
+        saveConfiguration();
+    }
+
+    private static bool ShouldHandleStatusEffect(ModuleStatusEffect effect, bool enabled)
+    {
+        return enabled ? effect.Enabled : effect.Enabled || effect.IsApplied || effect.HonorificIsApplied;
+    }
+
+    private void SyncHonorificStatusEffects(bool delayUntilStable)
+    {
+        var currentIndex = GetCurrentHonorificStatusEffectIndex();
+        var desiredIndex = GetDesiredHonorificStatusEffectIndex();
+        if (currentIndex == desiredIndex)
+        {
+            return;
+        }
+
+        if (desiredIndex >= 0)
+        {
+            ExecuteStatusEffectCommand(BuildHonorificSetCommand(configuration.ModuleStatusEffects[desiredIndex]), delayUntilStable);
+        }
+        else if (currentIndex >= 0)
+        {
+            ExecuteStatusEffectCommand("/honorific force clear", delayUntilStable);
+        }
+        else
+        {
+            return;
+        }
+
+        for (var i = 0; i < configuration.ModuleStatusEffects.Count; i++)
+        {
+            var effect = configuration.ModuleStatusEffects[i];
+            if (!effect.UseHonorific)
+            {
+                continue;
+            }
+
+            effect.HonorificIsApplied = i == desiredIndex;
+            if (!effect.UseMoodle)
+            {
+                effect.IsApplied = false;
+            }
+
+            configuration.ModuleStatusEffects[i] = effect;
+        }
+
+        saveConfiguration();
+    }
+
+    private int GetCurrentHonorificStatusEffectIndex()
+    {
+        for (var i = 0; i < configuration.ModuleStatusEffects.Count; i++)
+        {
+            var effect = configuration.ModuleStatusEffects[i];
+            if (effect.UseHonorific && (effect.HonorificIsApplied || (!effect.UseMoodle && effect.IsApplied)))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private int GetDesiredHonorificStatusEffectIndex()
+    {
+        var desiredIndex = -1;
+        var desiredPriority = int.MaxValue;
+        for (var i = 0; i < configuration.ModuleStatusEffects.Count; i++)
+        {
+            var effect = configuration.ModuleStatusEffects[i];
+            if (!effect.Enabled ||
+                !effect.UseHonorific ||
+                string.IsNullOrWhiteSpace(effect.HonorificTitle) ||
+                !HasAnySelectedStatusEffectModuleEnabled(effect))
+            {
+                continue;
+            }
+
+            var priority = Math.Max(1, effect.HonorificPriority);
+            if (priority < desiredPriority)
+            {
+                desiredPriority = priority;
+                desiredIndex = i;
+            }
+        }
+
+        return desiredIndex;
+    }
+
+    private void TriggerStatusMacro(ModuleStatusMacro macro, bool enabled, IReadOnlyCollection<StatusEffectModule> triggeringModules, bool delayUntilStable)
+    {
+        var macroText = enabled ? macro.EnableMacroText : macro.DisableMacroText;
+        if (string.IsNullOrWhiteSpace(macroText))
+        {
+            return;
+        }
+
+        if (enabled && macro.IsApplied)
+        {
+            return;
+        }
+
+        if (!enabled && !macro.IsApplied)
+        {
+            return;
+        }
+
+        if (enabled && HasAnySelectedStatusMacroModuleEnabledOutside(macro, triggeringModules))
+        {
+            return;
+        }
+
+        if (!enabled && HasAnySelectedStatusMacroModuleEnabled(macro))
+        {
+            return;
+        }
+
+        ExecuteStatusEffectMacro(macroText, delayUntilStable);
+        macro.IsApplied = enabled;
+        saveConfiguration();
+    }
+
+    private static bool ShouldHandleStatusMacro(ModuleStatusMacro macro, bool enabled)
+    {
+        return enabled ? macro.Enabled : macro.Enabled || macro.IsApplied;
+    }
+
+    private void ExecuteStatusEffectCommand(string command, bool delayUntilStable)
+    {
+        if (delayUntilStable)
+        {
+            pendingStatusEffectCommands.Enqueue(new DelayedCommand(
+                command,
+                "status effect",
+                DateTimeOffset.Now.AddMilliseconds(AutoStatusEffectDelayMilliseconds)));
+            return;
+        }
+
+        if (!TryExecuteTextCommand(command))
+        {
+            chatGui.PrintError($"Could not run status effect command: {command}", "RollTracker");
+        }
+    }
+
+    private void ExecuteStatusEffectMacro(string macroText, bool delayUntilStable)
+    {
+        var nextExecuteAt = DateTimeOffset.Now.AddMilliseconds(delayUntilStable ? AutoStatusEffectDelayMilliseconds : 0);
+        var lines = macroText
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var line in lines)
+        {
+            var step = ParseMacroStep(line);
+            if (step.WaitMilliseconds > 0)
+            {
+                nextExecuteAt = nextExecuteAt.AddMilliseconds(step.WaitMilliseconds);
+                continue;
+            }
+
+            if (delayUntilStable)
+            {
+                pendingStatusEffectCommands.Enqueue(new DelayedCommand(step.Command, "status effect macro", nextExecuteAt));
+            }
+            else
+            {
+                ExecuteStatusEffectCommand(step.Command, delayUntilStable: false);
+            }
+
+            nextExecuteAt = nextExecuteAt.AddMilliseconds(ClampMacroLineDelay(configuration.MacroLineDelayMilliseconds));
+        }
+    }
+
+    private void ExecuteNextStatusEffectCommand(DateTimeOffset now)
+    {
+        if (IsBetweenAreas())
+        {
+            return;
+        }
+
+        var delayedCommand = pendingStatusEffectCommands.Dequeue();
+        if (!TryExecuteTextCommand(delayedCommand.Command))
+        {
+            chatGui.PrintError($"Could not run status effect command: {delayedCommand.Command}", "RollTracker");
+        }
+    }
+
+    private static string BuildHonorificSetCommand(ModuleStatusEffect effect)
+    {
+        var command = new StringBuilder($"/honorific force set {FormatHonorificTitle(effect.HonorificTitle)}");
+        var position = NormalizeHonorificPosition(effect.HonorificPosition);
+        if (!string.IsNullOrWhiteSpace(position))
+        {
+            command.Append(" | ").Append(position);
+        }
+
+        if (!string.IsNullOrWhiteSpace(effect.HonorificColor))
+        {
+            command.Append(" | ").Append(NormalizeHexColor(effect.HonorificColor));
+        }
+
+        if (!string.IsNullOrWhiteSpace(effect.HonorificGlow))
+        {
+            command.Append(" | ").Append(NormalizeHexColor(effect.HonorificGlow));
+        }
+
+        return command.ToString();
+    }
+
+    private bool HasAnySelectedStatusEffectModuleEnabled(ModuleStatusEffect effect)
+    {
+        return (effect.TriggerOnTod && configuration.Enabled) ||
+            (effect.TriggerOnTodSecondPair && configuration.TodSecondPairEnabled) ||
+            (effect.TriggerOnTodSpecialRules && configuration.TodSpecialRulesEnabled) ||
+            (effect.TriggerOnTruth && configuration.TruthTriggerEnabled) ||
+            (effect.TriggerOnDare && configuration.DareTriggerEnabled) ||
+            (effect.TriggerOnHelp && configuration.HelpTriggerEnabled) ||
+            (effect.TriggerOnChatAlias && configuration.ChatAliasEnabled) ||
+            (effect.TriggerOnWifi && configuration.WifiEnabled);
+    }
+
+    private bool HasAnySelectedStatusEffectModuleEnabledOutside(ModuleStatusEffect effect, IReadOnlyCollection<StatusEffectModule> excludedModules)
+    {
+        return (effect.TriggerOnTod && !excludedModules.Contains(StatusEffectModule.Tod) && configuration.Enabled) ||
+            (effect.TriggerOnTodSecondPair && !excludedModules.Contains(StatusEffectModule.TodSecondPair) && configuration.TodSecondPairEnabled) ||
+            (effect.TriggerOnTodSpecialRules && !excludedModules.Contains(StatusEffectModule.TodSpecialRules) && configuration.TodSpecialRulesEnabled) ||
+            (effect.TriggerOnTruth && !excludedModules.Contains(StatusEffectModule.Truth) && configuration.TruthTriggerEnabled) ||
+            (effect.TriggerOnDare && !excludedModules.Contains(StatusEffectModule.Dare) && configuration.DareTriggerEnabled) ||
+            (effect.TriggerOnHelp && !excludedModules.Contains(StatusEffectModule.Help) && configuration.HelpTriggerEnabled) ||
+            (effect.TriggerOnChatAlias && !excludedModules.Contains(StatusEffectModule.ChatAlias) && configuration.ChatAliasEnabled) ||
+            (effect.TriggerOnWifi && !excludedModules.Contains(StatusEffectModule.Wifi) && configuration.WifiEnabled);
+    }
+
+    private bool HasAnySelectedStatusMacroModuleEnabled(ModuleStatusMacro macro)
+    {
+        return (macro.TriggerOnTod && configuration.Enabled) ||
+            (macro.TriggerOnTodSecondPair && configuration.TodSecondPairEnabled) ||
+            (macro.TriggerOnTodSpecialRules && configuration.TodSpecialRulesEnabled) ||
+            (macro.TriggerOnTruth && configuration.TruthTriggerEnabled) ||
+            (macro.TriggerOnDare && configuration.DareTriggerEnabled) ||
+            (macro.TriggerOnHelp && configuration.HelpTriggerEnabled) ||
+            (macro.TriggerOnChatAlias && configuration.ChatAliasEnabled) ||
+            (macro.TriggerOnWifi && configuration.WifiEnabled);
+    }
+
+    private bool HasAnySelectedStatusMacroModuleEnabledOutside(ModuleStatusMacro macro, IReadOnlyCollection<StatusEffectModule> excludedModules)
+    {
+        return (macro.TriggerOnTod && !excludedModules.Contains(StatusEffectModule.Tod) && configuration.Enabled) ||
+            (macro.TriggerOnTodSecondPair && !excludedModules.Contains(StatusEffectModule.TodSecondPair) && configuration.TodSecondPairEnabled) ||
+            (macro.TriggerOnTodSpecialRules && !excludedModules.Contains(StatusEffectModule.TodSpecialRules) && configuration.TodSpecialRulesEnabled) ||
+            (macro.TriggerOnTruth && !excludedModules.Contains(StatusEffectModule.Truth) && configuration.TruthTriggerEnabled) ||
+            (macro.TriggerOnDare && !excludedModules.Contains(StatusEffectModule.Dare) && configuration.DareTriggerEnabled) ||
+            (macro.TriggerOnHelp && !excludedModules.Contains(StatusEffectModule.Help) && configuration.HelpTriggerEnabled) ||
+            (macro.TriggerOnChatAlias && !excludedModules.Contains(StatusEffectModule.ChatAlias) && configuration.ChatAliasEnabled) ||
+            (macro.TriggerOnWifi && !excludedModules.Contains(StatusEffectModule.Wifi) && configuration.WifiEnabled);
+    }
+
+    private static string FormatHonorificTitle(string title)
+    {
+        return title.Trim().Trim('"');
+    }
+
+    private static string NormalizeHonorificPosition(string position)
+    {
+        return position.Trim().ToLowerInvariant() switch
+        {
+            "prefix" => "prefix",
+            "suffix" => "suffix",
+            _ => string.Empty,
+        };
+    }
+
+    private static string NormalizeHexColor(string color)
+    {
+        var trimmed = color.Trim();
+        return trimmed.StartsWith('#') ? trimmed : $"#{trimmed}";
+    }
+
+    private static string QuoteCommandArgument(string value)
+    {
+        return $"\"{value.Trim().Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
+    }
+
+    private static bool IsStatusEffectTriggeredByModule(ModuleStatusEffect effect, StatusEffectModule module)
+    {
+        return module switch
+        {
+            StatusEffectModule.Tod => effect.TriggerOnTod,
+            StatusEffectModule.TodSecondPair => effect.TriggerOnTodSecondPair,
+            StatusEffectModule.TodSpecialRules => effect.TriggerOnTodSpecialRules,
+            StatusEffectModule.Truth => effect.TriggerOnTruth,
+            StatusEffectModule.Dare => effect.TriggerOnDare,
+            StatusEffectModule.Help => effect.TriggerOnHelp,
+            StatusEffectModule.ChatAlias => effect.TriggerOnChatAlias,
+            StatusEffectModule.Wifi => effect.TriggerOnWifi,
+            _ => false,
+        };
+    }
+
+    private static bool IsStatusMacroTriggeredByModule(ModuleStatusMacro macro, StatusEffectModule module)
+    {
+        return module switch
+        {
+            StatusEffectModule.Tod => macro.TriggerOnTod,
+            StatusEffectModule.TodSecondPair => macro.TriggerOnTodSecondPair,
+            StatusEffectModule.TodSpecialRules => macro.TriggerOnTodSpecialRules,
+            StatusEffectModule.Truth => macro.TriggerOnTruth,
+            StatusEffectModule.Dare => macro.TriggerOnDare,
+            StatusEffectModule.Help => macro.TriggerOnHelp,
+            StatusEffectModule.ChatAlias => macro.TriggerOnChatAlias,
+            StatusEffectModule.Wifi => macro.TriggerOnWifi,
+            _ => false,
+        };
     }
 
     private static HashSet<uint> CreateDefaultResidentialTerritoryIds()
@@ -1896,8 +2539,14 @@ internal sealed partial class RollTrackerService : IDisposable
             target.Equals("tod rules", StringComparison.OrdinalIgnoreCase) ||
             target.Equals("special", StringComparison.OrdinalIgnoreCase))
         {
+            var changed = configuration.TodSpecialRulesEnabled != enabled;
             configuration.TodSpecialRulesEnabled = enabled;
             saveConfiguration();
+            if (changed)
+            {
+                TriggerModuleStatusEffects(StatusEffectModule.TodSpecialRules, enabled);
+            }
+
             chatGui.Print($"RollTracker ToD special rules {(enabled ? "enabled" : "disabled")}.", "RollTracker");
             return true;
         }
@@ -1997,6 +2646,7 @@ internal sealed partial class RollTrackerService : IDisposable
         {
             configuration.TodSpecialRulesEnabled = !configuration.TodSpecialRulesEnabled;
             saveConfiguration();
+            TriggerModuleStatusEffects(StatusEffectModule.TodSpecialRules, configuration.TodSpecialRulesEnabled);
             chatGui.Print($"RollTracker ToD special rules {(configuration.TodSpecialRulesEnabled ? "enabled" : "disabled")}.", "RollTracker");
             return true;
         }
@@ -2490,5 +3140,17 @@ internal sealed partial class RollTrackerService : IDisposable
     {
         Normal,
         SecondPair,
+    }
+
+    private enum StatusEffectModule
+    {
+        Tod,
+        TodSecondPair,
+        TodSpecialRules,
+        Truth,
+        Dare,
+        Help,
+        ChatAlias,
+        Wifi,
     }
 }

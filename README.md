@@ -21,7 +21,7 @@ To test unreleased updates in Dalamud, enable plugin testing builds in Dalamud's
 For local offline testing before publishing a GitHub testing build, see [LOCAL_DEV.md](LOCAL_DEV.md).
 
 Current stable: `0.1.0.58`
-Current testing: `0.1.0.60`
+Current testing: `0.1.0.61`
 
 ## Commands
 
@@ -29,7 +29,7 @@ Current testing: `0.1.0.60`
 - `/rt help` - shows the full command list locally as RollTracker plugin messages.
 - `/rt on` - enables all modules.
 - `/rt off` - disables all modules.
-- `/rt on tod` - enables Truth or Dare, `!truth`, and `!dare`.
+- `/rt on tod` - enables Truth or Dare. If enabled in settings, it also links `!truth` and `!dare`.
 - `/rt off tod` - disables only Truth or Dare.
 - `/rt on todrules` - enables the Truth or Dare special result text.
 - `/rt off todrules` - disables the Truth or Dare special result text.

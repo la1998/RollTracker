@@ -17,6 +17,32 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.61", """
+Status Effects:
+- Added support for Moodles, Honorific titles, and advanced custom macros.
+- Added separate Moodles and Honorific tables with per-entry module selection.
+- Added Honorific priority handling so multiple titles can be configured and the highest-priority active title is applied.
+- Added Honorific color and glow pickers with clear support.
+- Fixed Status Effects triggering from the ToD special rules settings toggle.
+- Fixed delayed Status Effects execution during housing transitions.
+
+Auto On improvements:
+- Added a housing address book for Auto On.
+- Saved housing interiors can now automatically turn selected modules back on when entered.
+- Added separate Auto On affected modules so Auto On and Auto Off can manage different module sets.
+- Added separate Enable Auto On and Enable Auto Off settings.
+- Fixed Auto Off conflicts when entering or leaving saved Auto On addresses.
+- Fixed housing address detection for interiors, FC rooms, private houses, and apartments across worlds/data centers.
+
+UI and Chat Alias:
+- Added separate Auto On and Auto Off tabs, settings, and affected-module selections.
+- Added a debug info window opened from the title bar.
+- Added configurable Chat Alias feedback, including delayed feedback messages and a global feedback toggle.
+- Added an option to link !truth and !dare to !tod / !tod2.
+- Changed displayed /rt command syntax to show on/off/toggle at the end.
+- Changed default ToD suggestions and Shell Infos placeholders for fresh installs.
+- Fixed Chat Alias /rt on and /rt toggle handling while Chat Alias is disabled when allowed in settings.
+"""),
         new("0.1.0.60", """
 Auto On improvements:
 - Added a housing address book for Auto On.

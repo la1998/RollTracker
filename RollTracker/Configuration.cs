@@ -17,6 +17,8 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool DareTriggerEnabled { get; set; } = true;
 
+    public bool LinkSuggestionsToTodModules { get; set; }
+
     public bool HelpTriggerEnabled { get; set; } = true;
 
     public bool ChatAliasEnabled { get; set; }
@@ -70,6 +72,10 @@ public sealed class Configuration : IPluginConfiguration
     public bool AutoEnableAffectsWifi { get; set; } = true;
 
     public List<HousingAddressEntry> AutoOnHousingAddresses { get; set; } = [];
+
+    public List<ModuleStatusEffect> ModuleStatusEffects { get; set; } = [];
+
+    public List<ModuleStatusMacro> ModuleStatusMacros { get; set; } = [];
 
     public bool AdvancedMode { get; set; }
 
@@ -143,7 +149,7 @@ public sealed class Configuration : IPluginConfiguration
 
     public int WifiMacroLineDelayMilliseconds { get; set; } = 1500;
 
-    public string WifiMacroText { get; set; } = "KinkHouse Shells and Discord:\nLightless - our main sync:\nID: LLS-SWN693A68P5R  PW: KinkHausOCE\n\nPlayerSync - our optional/backup sync:\nID: MSS-6AC6326WFU4P  PW: KinkHausOCE\n\nDiscord:\nhttps://discord.gg/7N7xaghGTr";
+    public string WifiMacroText { get; set; } = string.Empty;
 
     public static List<TodSpecialRule> CreateDefaultTodSpecialRules()
     {
@@ -164,7 +170,7 @@ public sealed class Configuration : IPluginConfiguration
             "!tod2 - Start a second-pair Truth or Dare roll round.",
             "!truth - Send a random Truth prompt.",
             "!dare - Send a random Dare prompt.",
-            "!wifi - Show KinkHouse Shells and Discord info.",
+            "!wifi - Show Shells and Discord info.",
         ];
     }
 
@@ -172,39 +178,26 @@ public sealed class Configuration : IPluginConfiguration
     {
         return
         [
-            "Anyone here whose design, or kinks they mentioned, makes you curious about them?",
-            "What was the funniest \"oops\" in ERP you had?",
-            "Ever had a laugh while being kinky, and what happened?",
-            "What does your ideal partner look and behave like?",
-            "Ever got to try out your biggest fantasy, and how did that turn out?",
-            "What is the lore/explanation behind your appearance and/or your name?",
-            "What is a guilty pleasure of yours (kinky, either, or normal) that you really care about?",
-            "What are you looking to find or achieve here the most?",
-            "What is the best or right way for someone to approach you? What should someone really know about you if they want to get to know you?",
-            "What is one of the biggest actual embarrassments you have had in FFXIV or kink circles?",
-            "What is the thing you want the most right now, and who here would be best suited for it?",
-            "Pick someone here you are not already in a relationship or dating with. You are going out for lunch/dinner - who is it and what are you getting?",
-            "What is a life lesson that was difficult for you or meant a lot to you?",
-            "Share one of your best relationship highlights.",
-            "What is a vice you have?",
-            "Favourite moment in the KH so far?",
-            "What is a side of you most people here do not know about?",
-            "What do you genuinely think of the person sitting opposite of you?",
-            "Who here have you imagined yourself in a NSFW or kinky way with? Excluding existing relationships.",
-            "What is your most deviant fetish?",
-            "What is your favourite type (or types) of restraint?",
-            "What animal is your favourite? And do you own any pets?",
-            "What do you care for the most in a person?",
-            "What is a major turn-on almost no one here knows about?",
-            "What is a major turn-off almost no one here knows about?",
-            "What is something you are actually really good at, but people do not know about?",
-            "What is the furthest you have gone for someone? Share what you can.",
-            "What is the best meal you have ever had? Describe it as best you can.",
-            "What is the most interesting thing you have put under your clothes or underwear?",
-            "What was the last thing that made you genuinely scream?",
-            "Have you ever stalked someone? Tell us about it.",
-            "What is the best gift someone could give you, here and/or in general?",
-            "What is a question you wish you were asked more often?",
+            "What is the weirdest thing you find attractive in someone?",
+            "Have you ever lied during a Truth or Dare game?",
+            "Who here do you think would be the most dangerous person to date?",
+            "What is the most embarrassing thing you've done to impress someone?",
+            "What is something you pretend not to care about but actually care about a lot?",
+            "Have you ever stalked someone's social media way further back than you'd admit?",
+            "What is your biggest weakness when someone is flirting with you?",
+            "What is the strangest dream you've ever had about someone you know?",
+            "Who here do you think knows you the least?",
+            "What is something you've done because you were jealous?",
+            "What is the worst excuse you've ever used to avoid someone?",
+            "Have you ever developed feelings for someone you originally didn't like?",
+            "What is one compliment you still remember because it meant a lot to you?",
+            "What personality trait instantly makes someone attractive to you?",
+            "What is something embarrassing you secretly enjoy?",
+            "Have you ever completely misunderstood someone flirting with you?",
+            "What is the boldest thing you've ever done because you liked someone?",
+            "If everyone here had to rate your flirting skills from 1-10, what score do you think you'd get?",
+            "What is something about yourself that you're surprisingly insecure about?",
+            "Who here do you think you'd get along with best if you were stuck together for an entire week?",
         ];
     }
 
@@ -212,27 +205,17 @@ public sealed class Configuration : IPluginConfiguration
     {
         return
         [
-            "Talk in UwU speak (https://lingojam.com/Englishtouwu if you do not want to do it manually) for x rounds",
-            "Strip any parts, or be completely naked for x rounds",
-            "Write a bad pick up line for (person)",
-            "Ask a person of your choice to sit on your lap, or let them sit on your lap",
-            "Dress in your lewdest non-naked outfit for x rounds",
-            "Show us the last lewd screenshot you made (or the last one you can show)",
-            "Equip one of your kinks as a moodle for x rounds",
-            "Roll /random for the number of outfits you have, and equip the rolled number",
-            "Pick a person you are not familiar with whatsoever, approach them with a compliment, and try to learn at least one thing about them that you are curious about",
-            "Let me pick your outfit for the next 20m",
-            "Pick 3 people from those present and give each at least one compliment",
-            "Describe 3 people here with songs",
-            "End every sentence with <whatever> for the next 20m",
-            "Make sure to greet every person who comes or leaves (including going AFK)",
-            "Make sure to greet every person who comes or leaves while addressing them with Miss/Mister and bowing",
-            "Find someone here to Strip-Deathroll",
-            "Come be my chair or footrest for the next 15m",
-            "Let me be your chair or footrest for the next 15m",
-            "Show off the most cursed thing you have",
-            "Showcase your latest addition(s) to your kink toolbelt (mod, plugin, trick, or whatever)",
-            "Change your colour scheme to this for 30m",
+            "Pick someone and give them the cheesiest pickup line you can think of.",
+            "Describe your character/avatar like you're trying to sell them on a dating website.",
+            "Pick another player and dramatically confess your completely fictional love for them.",
+            "Give everyone currently playing a ridiculous nickname.",
+            "Describe your ideal date using only five words.",
+            "Pick someone and give them three compliments.",
+            "Pretend you're an NPC and give another player a completely ridiculous quest.",
+            "Speak only in questions until your next turn.",
+            "Narrate everything your character does for the next 3 rounds like an overly dramatic documentary narrator.",
+            "Let the group choose three random words that you have to naturally use in your next message.",
+            "Pick another player and create the most ridiculous romantic backstory possible about how your characters supposedly met.",
         ];
     }
 }
@@ -306,4 +289,76 @@ public sealed class HousingAddressEntry
     public bool IsApartment { get; set; }
 
     public ulong HouseId { get; set; }
+}
+
+public sealed class ModuleStatusEffect
+{
+    public bool Enabled { get; set; } = true;
+
+    public bool IsApplied { get; set; }
+
+    public bool HonorificIsApplied { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public bool UseMoodle { get; set; } = true;
+
+    public string MoodleName { get; set; } = string.Empty;
+
+    public bool UseHonorific { get; set; }
+
+    public string HonorificTitle { get; set; } = string.Empty;
+
+    public string HonorificPosition { get; set; } = "title";
+
+    public string HonorificColor { get; set; } = string.Empty;
+
+    public string HonorificGlow { get; set; } = string.Empty;
+
+    public int HonorificPriority { get; set; } = 1;
+
+    public bool TriggerOnTod { get; set; } = true;
+
+    public bool TriggerOnTodSecondPair { get; set; }
+
+    public bool TriggerOnTodSpecialRules { get; set; }
+
+    public bool TriggerOnTruth { get; set; }
+
+    public bool TriggerOnDare { get; set; }
+
+    public bool TriggerOnHelp { get; set; }
+
+    public bool TriggerOnChatAlias { get; set; }
+
+    public bool TriggerOnWifi { get; set; }
+}
+
+public sealed class ModuleStatusMacro
+{
+    public bool Enabled { get; set; } = true;
+
+    public bool IsApplied { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string EnableMacroText { get; set; } = string.Empty;
+
+    public string DisableMacroText { get; set; } = string.Empty;
+
+    public bool TriggerOnTod { get; set; } = true;
+
+    public bool TriggerOnTodSecondPair { get; set; }
+
+    public bool TriggerOnTodSpecialRules { get; set; }
+
+    public bool TriggerOnTruth { get; set; }
+
+    public bool TriggerOnDare { get; set; }
+
+    public bool TriggerOnHelp { get; set; }
+
+    public bool TriggerOnChatAlias { get; set; }
+
+    public bool TriggerOnWifi { get; set; }
 }
