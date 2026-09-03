@@ -17,6 +17,15 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.62", """
+Settings and defaults:
+- New installations now start with all RollTracker modules disabled, matching /rt off behavior.
+- Auto On and Auto Off settings remain in the module settings list, but can only be changed while Advanced Mode is enabled.
+- Updated the Shell Infos placeholder text for fresh or empty shell info configs.
+
+Status Effects UI:
+- Fixed the Moodle table row alignment after the Honorific priority layout update.
+"""),
         new("0.1.0.61", """
 Status Effects:
 - Added support for Moodles, Honorific titles, and advanced custom macros.

@@ -101,10 +101,10 @@ internal sealed class MainWindow : Window, IDisposable
 
     private const string WifiMacroPlaceholder =
         "(Venue name) Shells and Discord:\n" +
-        "Lightless - our main sync:\n" +
-        "ID: LLS-XXXXXXXXXXXX PW: *************\n\n" +
-        "(sync plugin name) - our optional/backup sync:\n" +
-        "ID: XXX-XXXXXXXXXX PW: XXXXXXXXXX\n\n" +
+        "(Sync Plugin-Name) - our main sync:\n" +
+        "ID:                               PW: \n\n" +
+        "(Sync Plugin-Name) - our optional/backup sync:\n" +
+        "ID:                               PW: \n\n" +
         "Discord:\n" +
         "(Static Discord invite link)";
 
@@ -2508,6 +2508,7 @@ internal sealed class MainWindow : Window, IDisposable
 
     private void DrawStatusEffectBaseColumns(ModuleStatusEffect effect, int index)
     {
+        ImGui.TableNextColumn();
         DrawStatusEffectEnabledColumn(effect, index);
         DrawStatusEffectNameAndModulesColumns(effect, index);
     }
@@ -3241,8 +3242,19 @@ internal sealed class MainWindow : Window, IDisposable
 
     private void DrawAutoOffSettingsSummary()
     {
+        if (!configuration.AdvancedMode)
+        {
+            ImGui.BeginDisabled();
+        }
+
         DrawAutoOffMasterCheckbox("Enable Auto Off");
         DrawAutoOnMasterCheckbox("Enable Auto On");
+
+        if (!configuration.AdvancedMode)
+        {
+            ImGui.EndDisabled();
+            DrawAdvancedModeOnlyTooltip("Enable Advanced mode to change Auto On/Off.");
+        }
     }
 
     private void DrawChatAliasWakeToggle()

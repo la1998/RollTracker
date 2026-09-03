@@ -7,25 +7,25 @@ public sealed class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 1;
 
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; }
 
-    public bool TodSpecialRulesEnabled { get; set; } = true;
+    public bool TodSpecialRulesEnabled { get; set; }
 
     public bool TodSecondPairEnabled { get; set; }
 
-    public bool TruthTriggerEnabled { get; set; } = true;
+    public bool TruthTriggerEnabled { get; set; }
 
-    public bool DareTriggerEnabled { get; set; } = true;
+    public bool DareTriggerEnabled { get; set; }
 
     public bool LinkSuggestionsToTodModules { get; set; }
 
-    public bool HelpTriggerEnabled { get; set; } = true;
+    public bool HelpTriggerEnabled { get; set; }
 
     public bool ChatAliasEnabled { get; set; }
 
     public bool ChatAliasAllowEnableWhenDisabled { get; set; }
 
-    public bool WifiEnabled { get; set; } = true;
+    public bool WifiEnabled { get; set; }
 
     public bool AutoDisableWhenLeavingHousing { get; set; } = true;
 
