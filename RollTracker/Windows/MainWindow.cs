@@ -2278,14 +2278,14 @@ internal sealed class MainWindow : Window, IDisposable
             var enabled = macro.Enabled;
             if (ImGui.Checkbox("##Enabled", ref enabled))
             {
-                macro.Enabled = enabled;
-                if (!enabled && HasStatusMacroCommand(macro) && HasAnySelectedStatusMacroModuleEnabled(macro))
+                if (!enabled)
                 {
-                    macro.IsApplied = true;
+                    rollTrackerService.DisableStatusMacroEntry(i);
                 }
-
-                configuration.ModuleStatusMacros[i] = macro;
-                saveConfiguration();
+                else
+                {
+                    rollTrackerService.EnableStatusMacroEntry(i);
+                }
             }
 
             ImGui.TableNextColumn();
@@ -2550,22 +2550,14 @@ internal sealed class MainWindow : Window, IDisposable
 
         if (ImGui.Checkbox("##Enabled", ref enabled))
         {
-            effect.Enabled = enabled;
-            if (!enabled && HasStatusEffectCommand(effect) && HasAnySelectedStatusEffectModuleEnabled(effect))
+            if (!enabled)
             {
-                if (effect.UseMoodle)
-                {
-                    effect.IsApplied = true;
-                }
-
-                if (effect.UseHonorific && effect.HonorificIsApplied)
-                {
-                    effect.HonorificIsApplied = true;
-                }
+                rollTrackerService.DisableStatusEffectEntry(index);
             }
-
-            configuration.ModuleStatusEffects[index] = effect;
-            saveConfiguration();
+            else
+            {
+                rollTrackerService.EnableStatusEffectEntry(index);
+            }
         }
 
         if (blockedByOtherHonorific)

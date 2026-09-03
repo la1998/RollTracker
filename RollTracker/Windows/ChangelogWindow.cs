@@ -17,6 +17,27 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.64", """
+- Added Status Effects support for Moodles, Honorific titles, and advanced custom macros.
+- Added separate Moodles, Honorific, and Macro Mode sections with module-based triggers.
+- Added automatic apply/remove handling when linked RollTracker modules are enabled or disabled.
+- Added cleanup for active Moodles, Honorific titles, and macros when entries are disabled or the plugin unloads.
+- Added Honorific priority handling so the highest-priority active title wins and lower-priority titles can take over when needed.
+- Added color and glow pickers with clear buttons for Honorific entries.
+- Added a Moodles help window with setup instructions and a copyable example import code.
+- Added configurable Auto On and Auto Off settings, guarded behind Advanced Mode.
+- Added an address book for Auto On, using reliable housing-interior addresses across data centers and worlds.
+- Added separate Auto On and Auto Off subtabs.
+- Added an optional setting to link !truth and !dare to !tod / !tod2.
+- Improved fresh-install defaults so RollTracker starts with gameplay modules disabled.
+- Improved Chat Alias feedback controls with a single all-feedback toggle.
+- Improved Shell Infos placeholder text for venue-specific sync and Discord details.
+- Moved housing debug info into a separate debug window opened from the title bar.
+- Fixed Auto Off incorrectly firing during saved-address Auto On transitions.
+- Fixed Status Effects not triggering when ToD special rules were toggled directly.
+- Fixed module enable chat output so individual module toggles name the affected module.
+- Fixed table layout, row coloring, resizing, and alignment issues in Auto On/Off and Status Effects.
+"""),
         new("0.1.0.63", """
 Status Effects UI:
 - Added a Moodles help button next to the Moodle name column.

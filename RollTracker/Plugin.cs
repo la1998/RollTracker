@@ -161,6 +161,8 @@ public sealed class Plugin : IDalamudPlugin
 
     public void Dispose()
     {
+        RollTrackerService.ClearActiveStatusEffectsForShutdown();
+
         PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;

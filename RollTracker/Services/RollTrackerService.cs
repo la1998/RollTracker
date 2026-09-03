@@ -1792,6 +1792,128 @@ internal sealed partial class RollTrackerService : IDisposable
         return enabled ? effect.Enabled : effect.Enabled || effect.IsApplied || effect.HonorificIsApplied;
     }
 
+    public void DisableStatusEffectEntry(int index)
+    {
+        configuration.ModuleStatusEffects ??= [];
+        if (index < 0 || index >= configuration.ModuleStatusEffects.Count)
+        {
+            return;
+        }
+
+        var effect = configuration.ModuleStatusEffects[index];
+        effect.Enabled = false;
+
+        if (effect.UseMoodle && effect.IsApplied && !string.IsNullOrWhiteSpace(effect.MoodleName))
+        {
+            ExecuteStatusEffectCommand($"/moodle remove self moodle {QuoteCommandArgument(effect.MoodleName)}", delayUntilStable: false);
+            effect.IsApplied = false;
+        }
+
+        configuration.ModuleStatusEffects[index] = effect;
+        if (effect.UseHonorific)
+        {
+            SyncHonorificStatusEffects(delayUntilStable: false);
+        }
+        else
+        {
+            saveConfiguration();
+        }
+    }
+
+    public void EnableStatusEffectEntry(int index)
+    {
+        configuration.ModuleStatusEffects ??= [];
+        if (index < 0 || index >= configuration.ModuleStatusEffects.Count)
+        {
+            return;
+        }
+
+        var effect = configuration.ModuleStatusEffects[index];
+        effect.Enabled = true;
+
+        if (effect.UseMoodle &&
+            !effect.IsApplied &&
+            !string.IsNullOrWhiteSpace(effect.MoodleName) &&
+            HasAnySelectedStatusEffectModuleEnabled(effect))
+        {
+            ExecuteStatusEffectCommand($"/moodle apply self moodle {QuoteCommandArgument(effect.MoodleName)}", delayUntilStable: false);
+            effect.IsApplied = true;
+        }
+
+        configuration.ModuleStatusEffects[index] = effect;
+        if (effect.UseHonorific)
+        {
+            SyncHonorificStatusEffects(delayUntilStable: false);
+        }
+        else
+        {
+            saveConfiguration();
+        }
+    }
+
+    public void ClearActiveStatusEffectsForShutdown()
+    {
+        configuration.ModuleStatusEffects ??= [];
+        configuration.ModuleStatusMacros ??= [];
+        var changed = false;
+        var clearHonorific = false;
+
+        for (var i = 0; i < configuration.ModuleStatusEffects.Count; i++)
+        {
+            var effect = configuration.ModuleStatusEffects[i];
+            if (effect.UseMoodle && effect.IsApplied && !string.IsNullOrWhiteSpace(effect.MoodleName))
+            {
+                ExecuteStatusEffectCommand($"/moodle remove self moodle {QuoteCommandArgument(effect.MoodleName)}", delayUntilStable: false);
+                effect.IsApplied = false;
+                changed = true;
+            }
+
+            if (effect.UseHonorific && (effect.HonorificIsApplied || (!effect.UseMoodle && effect.IsApplied)))
+            {
+                effect.HonorificIsApplied = false;
+                if (!effect.UseMoodle)
+                {
+                    effect.IsApplied = false;
+                }
+
+                clearHonorific = true;
+                changed = true;
+            }
+
+            configuration.ModuleStatusEffects[i] = effect;
+        }
+
+        for (var i = 0; i < configuration.ModuleStatusMacros.Count; i++)
+        {
+            var macro = configuration.ModuleStatusMacros[i];
+            if (!macro.IsApplied)
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(macro.DisableMacroText))
+            {
+                ExecuteStatusEffectMacro(macro.DisableMacroText, delayUntilStable: false);
+            }
+
+            macro.IsApplied = false;
+            configuration.ModuleStatusMacros[i] = macro;
+            changed = true;
+        }
+
+        if (clearHonorific)
+        {
+            ExecuteStatusEffectCommand("/honorific force clear", delayUntilStable: false);
+        }
+
+        pendingStatusEffectCommands.Clear();
+
+        if (changed)
+        {
+            saveConfiguration();
+        }
+    }
+
     private void SyncHonorificStatusEffects(bool delayUntilStable)
     {
         var currentIndex = GetCurrentHonorificStatusEffectIndex();
@@ -1910,6 +2032,54 @@ internal sealed partial class RollTrackerService : IDisposable
     private static bool ShouldHandleStatusMacro(ModuleStatusMacro macro, bool enabled)
     {
         return enabled ? macro.Enabled : macro.Enabled || macro.IsApplied;
+    }
+
+    public void DisableStatusMacroEntry(int index)
+    {
+        configuration.ModuleStatusMacros ??= [];
+        if (index < 0 || index >= configuration.ModuleStatusMacros.Count)
+        {
+            return;
+        }
+
+        var macro = configuration.ModuleStatusMacros[index];
+        macro.Enabled = false;
+
+        if (macro.IsApplied)
+        {
+            if (!string.IsNullOrWhiteSpace(macro.DisableMacroText))
+            {
+                ExecuteStatusEffectMacro(macro.DisableMacroText, delayUntilStable: false);
+            }
+
+            macro.IsApplied = false;
+        }
+
+        configuration.ModuleStatusMacros[index] = macro;
+        saveConfiguration();
+    }
+
+    public void EnableStatusMacroEntry(int index)
+    {
+        configuration.ModuleStatusMacros ??= [];
+        if (index < 0 || index >= configuration.ModuleStatusMacros.Count)
+        {
+            return;
+        }
+
+        var macro = configuration.ModuleStatusMacros[index];
+        macro.Enabled = true;
+
+        if (!macro.IsApplied &&
+            !string.IsNullOrWhiteSpace(macro.EnableMacroText) &&
+            HasAnySelectedStatusMacroModuleEnabled(macro))
+        {
+            ExecuteStatusEffectMacro(macro.EnableMacroText, delayUntilStable: false);
+            macro.IsApplied = true;
+        }
+
+        configuration.ModuleStatusMacros[index] = macro;
+        saveConfiguration();
     }
 
     private void ExecuteStatusEffectCommand(string command, bool delayUntilStable)
