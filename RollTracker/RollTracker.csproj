@@ -1,6 +1,6 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.1.0.62</Version>
+    <Version>0.1.0.63</Version>
     <Authors>private</Authors>
     <Company>private</Company>
     <Description>Tracks /random rolls and shows round results in an ImGui window.</Description>

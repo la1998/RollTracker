@@ -17,6 +17,13 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.63", """
+Status Effects UI:
+- Added a Moodles help button next to the Moodle name column.
+- Added a dedicated Moodles help window that explains how to create or import a Moodle before using it in RollTracker.
+- Added a copy button for an example ToD Moodle import code.
+- Made the example Moodle import code wrap inside a scrollable help panel.
+"""),
         new("0.1.0.62", """
 Settings and defaults:
 - New installations now start with all RollTracker modules disabled, matching /rt off behavior.

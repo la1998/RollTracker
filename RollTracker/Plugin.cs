@@ -105,6 +105,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private HousingDebugWindow HousingDebugWindow { get; }
 
+    private MoodlesHelpWindow MoodlesHelpWindow { get; }
+
     public Plugin()
     {
         var currentVersion = GetPluginVersion();
@@ -125,6 +127,7 @@ public sealed class Plugin : IDalamudPlugin
         RollHistoryWindow = new RollHistoryWindow(RollTrackerService);
         ChangelogWindow = new ChangelogWindow(Configuration, SaveConfiguration, currentVersion);
         HousingDebugWindow = new HousingDebugWindow(RollTrackerService);
+        MoodlesHelpWindow = new MoodlesHelpWindow();
         MainWindow = new MainWindow(
             RollTrackerService,
             Configuration,
@@ -133,12 +136,14 @@ public sealed class Plugin : IDalamudPlugin
             SaveConfiguration,
             () => RollHistoryWindow.IsOpen = true,
             ChangelogWindow.OpenHistory,
-            () => HousingDebugWindow.IsOpen = true);
+            () => HousingDebugWindow.IsOpen = true,
+            () => MoodlesHelpWindow.IsOpen = true);
 
         WindowSystem.AddWindow(MainWindow);
         WindowSystem.AddWindow(RollHistoryWindow);
         WindowSystem.AddWindow(ChangelogWindow);
         WindowSystem.AddWindow(HousingDebugWindow);
+        WindowSystem.AddWindow(MoodlesHelpWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -168,6 +173,7 @@ public sealed class Plugin : IDalamudPlugin
         RollHistoryWindow.Dispose();
         ChangelogWindow.Dispose();
         HousingDebugWindow.Dispose();
+        MoodlesHelpWindow.Dispose();
         RollTrackerService.Dispose();
     }
 

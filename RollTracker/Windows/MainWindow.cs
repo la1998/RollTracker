@@ -130,6 +130,7 @@ internal sealed class MainWindow : Window, IDisposable
     private readonly Action openRollHistoryWindow;
     private readonly Action openChangelogWindow;
     private readonly Action openHousingDebugWindow;
+    private readonly Action openMoodlesHelpWindow;
 
     private string newTruthPrompt = string.Empty;
     private string newDarePrompt = string.Empty;
@@ -161,7 +162,8 @@ internal sealed class MainWindow : Window, IDisposable
         Action saveConfiguration,
         Action openRollHistoryWindow,
         Action openChangelogWindow,
-        Action openHousingDebugWindow)
+        Action openHousingDebugWindow,
+        Action openMoodlesHelpWindow)
         : base("RollTracker##RollTrackerMainWindow")
     {
         this.rollTrackerService = rollTrackerService;
@@ -172,6 +174,7 @@ internal sealed class MainWindow : Window, IDisposable
         this.openRollHistoryWindow = openRollHistoryWindow;
         this.openChangelogWindow = openChangelogWindow;
         this.openHousingDebugWindow = openHousingDebugWindow;
+        this.openMoodlesHelpWindow = openMoodlesHelpWindow;
 
         Flags = ImGuiWindowFlags.None;
         SizeConstraints = new WindowSizeConstraints
@@ -2364,7 +2367,7 @@ internal sealed class MainWindow : Window, IDisposable
         ImGui.TableSetupColumn("Modules", ImGuiTableColumnFlags.WidthStretch, 0, 1);
         ImGui.TableSetupColumn("Moodle name", ImGuiTableColumnFlags.WidthStretch, 0, 2);
         ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 82 * ImGuiHelpers.GlobalScale);
-        ImGui.TableHeadersRow();
+        DrawMoodleStatusEffectTableHeaders();
 
         for (var i = 0; i < configuration.ModuleStatusEffects.Count; i++)
         {
@@ -2408,6 +2411,29 @@ internal sealed class MainWindow : Window, IDisposable
             minTableHeight,
             maxTableHeight,
             resizeHandleHeight);
+    }
+
+    private void DrawMoodleStatusEffectTableHeaders()
+    {
+        ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
+        ImGui.TableNextColumn();
+        ImGui.TableHeader("On");
+        ImGui.TableNextColumn();
+        ImGui.TableHeader("Name");
+        ImGui.TableNextColumn();
+        ImGui.TableHeader("Modules");
+        ImGui.TableNextColumn();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted("Moodle name");
+        ImGui.SameLine();
+        if (ImGui.SmallButton("?##MoodleNameHelp"))
+        {
+            openMoodlesHelpWindow();
+        }
+
+        DrawHelpTooltip("Open setup help for Moodles integration.");
+        ImGui.TableNextColumn();
+        ImGui.TableHeader(string.Empty);
     }
 
     private void DrawHonorificStatusEffectTable()
