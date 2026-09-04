@@ -23,12 +23,14 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandHelp =
         "Commands:\n" +
         "/rt - open or close the window.\n" +
+        "/rt history - open the roll history window.\n" +
         "/rt help - show RollTracker commands locally.";
     private const string AliasCommandHelp = "Alias for /rt. Use /rt help to see the command list.";
     private static readonly string[] CommandHelpLines =
     [
         "/rt - open or close the window.",
         "/rt help - show this command list locally.",
+        "/rt history - open the roll history window.",
         "/rt on - enable all modules.",
         "/rt off - disable all modules.",
         "/rt toggle - toggle all modules.",
@@ -186,6 +188,15 @@ public sealed class Plugin : IDalamudPlugin
         if (trimmedArgs.Equals("help", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandHelp();
+            return;
+        }
+
+        if (trimmedArgs.Equals("history", StringComparison.OrdinalIgnoreCase) ||
+            trimmedArgs.Equals("rollhistory", StringComparison.OrdinalIgnoreCase) ||
+            trimmedArgs.Equals("roll history", StringComparison.OrdinalIgnoreCase) ||
+            trimmedArgs.Equals("rolls", StringComparison.OrdinalIgnoreCase))
+        {
+            RollHistoryWindow.Toggle();
             return;
         }
 

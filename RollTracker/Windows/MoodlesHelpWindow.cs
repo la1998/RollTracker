@@ -37,7 +37,10 @@ internal sealed class MoodlesHelpWindow : Window, IDisposable
         ImGui.Spacing();
 
         ImGui.TextWrapped("RollTracker does not create Moodles by itself. First create or import a Moodle in the Moodles plugin, then enter that exact Moodle name in the RollTracker Moodle name field.");
+        ImGui.Spacing();
         ImGui.TextWrapped("For example, if you import the sample below into Moodles and name it ToD, enter ToD as the Moodle name in RollTracker.");
+        ImGui.Spacing();
+        ImGui.TextWrapped("If your Moodle is inside a Moodles folder, include the folder path. For example, a Moodle named ToD inside a folder named Truth or Dare should be entered as Truth or Dare/ToD.");
 
         ImGui.Spacing();
         if (ImGui.Button("Copy example Moodle import code", new Vector2(250 * ImGuiHelpers.GlobalScale, 0)))

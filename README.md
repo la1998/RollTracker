@@ -34,6 +34,7 @@ You can add it under `/xlsettings` > `Experimental` > `Custom Plugin Repositorie
 /rt on
 /rt off
 /rt status
+/rt history
 /rt reset
 /rt end
 ```

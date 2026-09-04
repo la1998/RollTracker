@@ -17,6 +17,14 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private static readonly IReadOnlyList<ChangelogEntry> Entries =
     [
+        new("0.1.0.65", """
+- Added /rt history to open the Roll History window directly.
+- Changed /rt history so it toggles the Roll History window closed again when it is already open.
+- Added /rt history to the command help, README, and Chat Alias command picker.
+- Improved the Moodles help window with clearer spacing between setup sections.
+- Added Moodles folder-path guidance, including the Truth or Dare/ToD example for Moodles stored inside folders.
+- Modernized the GitHub README so it focuses on installation, key features, main commands, chat triggers, Status Effects, and safety notes.
+"""),
         new("0.1.0.64", """
 - Added Status Effects support for Moodles, Honorific titles, and advanced custom macros.
 - Added separate Moodles, Honorific, and Macro Mode sections with module-based triggers.

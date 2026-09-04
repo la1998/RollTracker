@@ -86,6 +86,7 @@ internal sealed class MainWindow : Window, IDisposable
         ("/rt wifi on", "wifi on"),
         ("/rt wifi off", "wifi off"),
         ("/rt wifi toggle", "wifi toggle"),
+        ("/rt history", "history"),
         ("/rt reset", "reset"),
         ("/rt end", "end"),
         ("/rt test", "test"),
